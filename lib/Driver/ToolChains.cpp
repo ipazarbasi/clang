@@ -389,6 +389,30 @@ void DarwinClang::AddLinkRuntimeLibArgs(const ArgList &Args,
     AddLinkSanitizerLibArgs(Args, CmdArgs, "asan");
   if (Sanitize.needsUbsanRt())
     AddLinkSanitizerLibArgs(Args, CmdArgs, "ubsan");
+  if (Sanitize.needsTsanRt()) {
+    // if (isTargetIPhoneOS()) {
+    //   getDriver().Diag(diag::err_drv_clang_unsupported_per_platform)
+    //     << "-fsanitize=address";
+    // }
+    if (!Args.hasArg(options::OPT_dynamiclib) &&
+        !Args.hasArg(options::OPT_bundle)) {
+      // The ASAN runtime library requires C++.
+      AddCXXStdlibLibArgs(Args, CmdArgs);
+    }
+    if (isTargetMacOS()) {
+      AddLinkRuntimeLib(Args, CmdArgs,
+                        "libclang_rt.tsan_osx_dynamic.dylib",
+                        /*AlwaysLink*/ true, /*IsEmbedded*/ false,
+                        /*AddRPath*/ true);
+    } else {
+      if (isTargetIOSSimulator()) {
+        AddLinkRuntimeLib(Args, CmdArgs,
+                          "libclang_rt.tsan_iossim_dynamic.dylib",
+                          /*AlwaysLink*/ true, /*IsEmbedded*/ false,
+                          /*AddRPath*/ true);
+      }
+    }
+  }
 
   // Otherwise link libSystem, then the dynamic runtime library, and finally any
   // target specific static runtime library.
@@ -1192,10 +1216,13 @@ void Darwin::CheckObjCARC() const {
 }
 
 SanitizerMask Darwin::getSupportedSanitizers() const {
+  const bool IsX86_64 = getTriple().getArch() == llvm::Triple::x86_64;
   SanitizerMask Res = ToolChain::getSupportedSanitizers();
   if (isTargetMacOS() || isTargetIOSSimulator())
     Res |= SanitizerKind::Address;
   if (isTargetMacOS()) {
+    if (IsX86_64)
+      Res |= SanitizerKind::Thread;
     if (!isMacosxVersionLT(10, 9))
       Res |= SanitizerKind::Vptr;
     Res |= SanitizerKind::SafeStack;
