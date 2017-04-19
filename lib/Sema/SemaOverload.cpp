@@ -3677,6 +3677,24 @@ isBetterReferenceBindingKind(const StandardConversionSequence &SCS1,
           !SCS2.IsLvalueReference && SCS2.BindsToFunctionLvalue);
 }
 
+/// \brief Returns whether given standard conversion sequence is converting an
+/// unscoped enumeration, whose underlying type is fixed, to its underlying
+/// type.
+static bool
+isEnumConversionToUnderlyingType(const ASTContext &Context,
+                                 const StandardConversionSequence &SCS) {
+  QualType FromType = SCS.getFromType();
+
+  const EnumType *FromEnumType = FromType->getAs<EnumType>();
+  if (!FromEnumType || FromEnumType->getDecl()->isScoped() ||
+      !FromEnumType->getDecl()->isFixed())
+    return false;
+
+  QualType ToType = SCS.getToType(1);
+  QualType Underlying = FromEnumType->getDecl()->getIntegerType();
+  return Context.hasSameUnqualifiedType(Underlying, ToType);
+}
+
 /// CompareStandardConversionSequences - Compare two standard
 /// conversion sequences to determine whether one is better than the
 /// other or if they are indistinguishable (C++ 13.3.3.2p3).
@@ -3847,6 +3865,19 @@ CompareStandardConversionSequences(Sema &S, SourceLocation Loc,
           S.Context.getTypeSize(SCS1.getToType(2)))
     return ImplicitConversionSequence::Better;
 
+  // Per DR1601, which is included in C++14; 13.3.3.2p4b2
+  //  -- A conversion that promotes an enumeration whose underlying type is
+  //     fixed to its underlying type is better than one that promotes to the
+  //     promoted underlying type, if the two are different.
+  if (S.getLangOpts().CPlusPlus11 &&
+      (SCS1.getToType(1).getTypePtr() != SCS2.getToType(1).getTypePtr())) {
+    bool S1ConvResult = isEnumConversionToUnderlyingType(S.Context, SCS1);
+    bool S2ConvResult = isEnumConversionToUnderlyingType(S.Context, SCS2);
+    if (S1ConvResult && !S2ConvResult)
+      return ImplicitConversionSequence::Better;
+    else if (!S1ConvResult && S2ConvResult)
+      return ImplicitConversionSequence::Worse;
+  }
   return ImplicitConversionSequence::Indistinguishable;
 }
 

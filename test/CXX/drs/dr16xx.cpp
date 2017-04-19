@@ -3,6 +3,25 @@
 // RUN: %clang_cc1 -std=c++14 -triple x86_64-unknown-unknown %s -verify -fexceptions -fcxx-exceptions -pedantic-errors
 // RUN: %clang_cc1 -std=c++1z -triple x86_64-unknown-unknown %s -verify -fexceptions -fcxx-exceptions -pedantic-errors
 
+namespace dr1601 {
+#if __cplusplus >= 201103L
+  enum B : bool { b };
+  enum C : char { c };
+  enum E { e };
+
+  int &func(bool);      // expected-note{{candidate function}}
+  double &func(char);   // expected-note{{candidate function}}
+  void func(unsigned);  // expected-note{{candidate function}}
+  void func(long);      // expected-note{{candidate function}}
+
+  void g() {
+    int &r = func(b);
+    double &d = func(c);
+    func(e);  // expected-error {{call to 'func' is ambiguous}}
+  }
+#endif
+}
+
 namespace dr1611 { // dr1611: dup 1658
   struct A { A(int); };
   struct B : virtual A { virtual void f() = 0; };
