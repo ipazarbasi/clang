@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -fblocks -Woverriding-method-mismatch -Wno-nullability-declspec %s -verify
+// RUN: %clang_cc1 -fsyntax-only -fblocks -Woverriding-method-mismatch -Wno-nullability-declspec -Wnullable-to-nonnull-conversion %s -verify
 
 __attribute__((objc_root_class))
 @interface NSFoo
@@ -36,14 +36,14 @@ __attribute__((objc_root_class))
 
 - (nonnull NSFoo **)invalidMethod1; // expected-error{{nullability keyword 'nonnull' cannot be applied to multi-level pointer type 'NSFoo **'}}
 // expected-note@-1{{use nullability type specifier '_Nonnull' to affect the innermost pointer type of 'NSFoo **'}}
-- (nonnull NSFoo * _Nullable)conflictingMethod1; // expected-error{{nullability specifier '_Nullable' conflicts with existing specifier '_Nonnull'}}
-- (nonnull NSFoo * _Nonnull)redundantMethod1; // expected-warning{{duplicate nullability specifier '_Nonnull'}}
+- (nonnull NSFoo * _Nullable)conflictingMethod1; // expected-error{{nullability specifier 'nonnull' conflicts with existing specifier '_Nullable'}}
+- (nonnull NSFoo * _Nonnull)redundantMethod1; // expected-warning{{duplicate nullability specifier 'nonnull'}}
 
 @property(nonnull,retain) NSFoo *property1;
 @property(nullable,assign) NSFoo ** invalidProperty1; // expected-error{{nullability keyword 'nullable' cannot be applied to multi-level pointer type 'NSFoo **'}}
 // expected-note@-1{{use nullability type specifier '_Nullable' to affect the innermost pointer type of 'NSFoo **'}}
-@property(null_unspecified,retain) NSFoo * _Nullable conflictingProperty1; // expected-error{{nullability specifier '_Nullable' conflicts with existing specifier '_Null_unspecified'}}
-@property(retain,nonnull) NSFoo * _Nonnull redundantProperty1; // expected-warning{{duplicate nullability specifier '_Nonnull'}}
+@property(null_unspecified,retain) NSFoo * _Nullable conflictingProperty1; // expected-error{{nullability specifier 'null_unspecified' conflicts with existing specifier '_Nullable'}}
+@property(retain,nonnull) NSFoo * _Nonnull redundantProperty1; // expected-warning{{duplicate nullability specifier 'nonnull'}}
 
 @property(null_unspecified,retain,nullable) NSFoo *conflictingProperty3; // expected-error{{nullability specifier 'nullable' conflicts with existing specifier 'null_unspecified'}}
 @property(nullable,retain,nullable) NSFoo *redundantProperty3; // expected-warning{{duplicate nullability specifier 'nullable'}}
@@ -53,8 +53,8 @@ __attribute__((objc_root_class))
 @property(nonnull,retain) NSFoo *property2;
 @property(nullable,assign) NSFoo ** invalidProperty2; // expected-error{{nullability keyword 'nullable' cannot be applied to multi-level pointer type 'NSFoo **'}}
 // expected-note@-1{{use nullability type specifier '_Nullable' to affect the innermost pointer type of 'NSFoo **'}}
-@property(null_unspecified,retain) NSFoo * _Nullable conflictingProperty2; // expected-error{{nullability specifier '_Nullable' conflicts with existing specifier '_Null_unspecified'}}
-@property(retain,nonnull) NSFoo * _Nonnull redundantProperty2; // expected-warning{{duplicate nullability specifier '_Nonnull'}}
+@property(null_unspecified,retain) NSFoo * _Nullable conflictingProperty2; // expected-error{{nullability specifier 'null_unspecified' conflicts with existing specifier '_Nullable'}}
+@property(retain,nonnull) NSFoo * _Nonnull redundantProperty2; // expected-warning{{duplicate nullability specifier 'nonnull'}}
 @end
 
 void test_accepts_nonnull_null_pointer_literal(NSFoo *foo, _Nonnull NSBar *bar) {
@@ -157,7 +157,7 @@ __attribute__((objc_root_class))
 - (nullable instancetype)returnMe;
 + (nullable instancetype)returnInstanceOfMe;
 
-- (nonnull instancetype _Nullable)initWithBlah2:(nonnull id)blah; // expected-error {{nullability specifier '_Nullable' conflicts with existing specifier '_Nonnull'}}
+- (nonnull instancetype _Nullable)initWithBlah2:(nonnull id)blah; // expected-error {{nullability specifier 'nonnull' conflicts with existing specifier '_Nullable'}}
 - (instancetype _Nullable)returnMe2;
 + (_Nonnull instancetype)returnInstanceOfMe2;
 @end
@@ -229,4 +229,64 @@ void testBlockLiterals() {
   (void)(^ _Nullable id(void) { return 0; });
 
   int *x = (^ _Nullable id(void) { return 0; })(); // expected-warning{{incompatible pointer types initializing 'int *' with an expression of type 'id _Nullable'}}
+}
+
+// Check nullability of conditional expressions.
+void conditional_expr(int c) {
+  NSFoo * _Nonnull p;
+  NSFoo * _Nonnull nonnullP;
+  NSFoo * _Nullable nullableP;
+  NSFoo * _Null_unspecified unspecifiedP;
+  NSFoo *noneP;
+
+  p = c ? nonnullP : nonnullP;
+  p = c ? nonnullP : nullableP; // expected-warning{{implicit conversion from nullable pointer 'NSFoo * _Nullable' to non-nullable pointer type 'NSFoo * _Nonnull'}}
+  p = c ? nonnullP : unspecifiedP;
+  p = c ? nonnullP : noneP;
+  p = c ? nullableP : nonnullP; // expected-warning{{implicit conversion from nullable pointer 'NSFoo * _Nullable' to non-nullable pointer type 'NSFoo * _Nonnull'}}
+  p = c ? nullableP : nullableP; // expected-warning{{implicit conversion from nullable pointer 'NSFoo * _Nullable' to non-nullable pointer type 'NSFoo * _Nonnull'}}
+  p = c ? nullableP : unspecifiedP; // expected-warning{{implicit conversion from nullable pointer 'NSFoo * _Nullable' to non-nullable pointer type 'NSFoo * _Nonnull'}}
+  p = c ? nullableP : noneP; // expected-warning{{implicit conversion from nullable pointer 'NSFoo * _Nullable' to non-nullable pointer type 'NSFoo * _Nonnull'}}
+  p = c ? unspecifiedP : nonnullP;
+  p = c ? unspecifiedP : nullableP; // expected-warning{{implicit conversion from nullable pointer 'NSFoo * _Nullable' to non-nullable pointer type 'NSFoo * _Nonnull'}}
+  p = c ? unspecifiedP : unspecifiedP;
+  p = c ? unspecifiedP : noneP;
+  p = c ? noneP : nonnullP;
+  p = c ? noneP : nullableP; // expected-warning{{implicit conversion from nullable pointer 'NSFoo * _Nullable' to non-nullable pointer type 'NSFoo * _Nonnull'}}
+  p = c ? noneP : unspecifiedP;
+  p = c ? noneP : noneP;
+}
+
+typedef int INTS[4];
+@interface ArraysInMethods
+- (void)simple:(int [_Nonnull 2])x;
+- (void)nested:(void *_Nullable [_Nonnull 2])x;
+- (void)nestedBad:(int [2][_Nonnull 2])x; // expected-error {{nullability specifier '_Nonnull' cannot be applied to non-pointer type 'int [2]'}}
+
+- (void)withTypedef:(INTS _Nonnull)x;
+- (void)withTypedefBad:(INTS _Nonnull[2])x; // expected-error{{nullability specifier '_Nonnull' cannot be applied to non-pointer type 'INTS' (aka 'int [4]')}}
+
+- (void)simpleSugar:(nonnull int [2])x;
+- (void)nestedSugar:(nonnull void *_Nullable [2])x; // expected-error {{nullability keyword 'nonnull' cannot be applied to multi-level pointer type 'void * _Nullable [2]'}} expected-note {{use nullability type specifier '_Nonnull' to affect the innermost pointer type of 'void * _Nullable [2]'}}
+- (void)sugarWithTypedef:(nonnull INTS)x;
+@end
+
+void test(ArraysInMethods *obj) {
+  [obj simple:0]; // expected-warning {{null passed to a callee that requires a non-null argument}}
+  [obj nested:0]; // expected-warning {{null passed to a callee that requires a non-null argument}}
+  [obj withTypedef:0]; // expected-warning {{null passed to a callee that requires a non-null argument}}
+
+  [obj simpleSugar:0]; // expected-warning {{null passed to a callee that requires a non-null argument}}
+  [obj sugarWithTypedef:0]; // expected-warning {{null passed to a callee that requires a non-null argument}}
+}
+
+// Check that we don't propagate the nullability specifier on the receiver to
+// the result type of a message send if the result type cannot have a
+// nullability specifier.
+@interface C0
+-(int) count;
+@end
+
+void testMessageSendResultType(C0 * _Nullable c0) {
+  int *p = [c0 count]; // expected-warning {{incompatible integer to pointer conversion initializing 'int *' with an expression of type 'int'}}
 }

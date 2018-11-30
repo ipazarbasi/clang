@@ -25,8 +25,8 @@ using namespace ento;
 
 void ento::registerBuiltinCheckers(CheckerRegistry &registry) {
 #define GET_CHECKERS
-#define CHECKER(FULLNAME,CLASS,DESCFILE,HELPTEXT,GROUPINDEX,HIDDEN)    \
+#define CHECKER(FULLNAME, CLASS, HELPTEXT)                                     \
   registry.addChecker(register##CLASS, FULLNAME, HELPTEXT);
-#include "Checkers.inc"
+#include "clang/StaticAnalyzer/Checkers/Checkers.inc"
 #undef GET_CHECKERS
 }

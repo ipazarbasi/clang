@@ -21,10 +21,30 @@
   int has_clang_fallthrough_2();
 #endif
 
-// The scope cannot be bracketed with double underscores.
+// The scope cannot be bracketed with double underscores unless it is
+// for gnu or clang.
+// CHECK: does_not_have___gsl___suppress
+#if !__has_cpp_attribute(__gsl__::suppress)
+  int does_not_have___gsl___suppress();
+#endif
+
+// We do somewhat support the __clang__ vendor namespace, but it is a
+// predefined macro and thus we encourage users to use _Clang instead.
+// Because of this, we do not support __has_cpp_attribute for that
+// vendor namespace.
 // CHECK: does_not_have___clang___fallthrough
 #if !__has_cpp_attribute(__clang__::fallthrough)
   int does_not_have___clang___fallthrough();
+#endif
+
+// CHECK: does_have_Clang_fallthrough
+#if __has_cpp_attribute(_Clang::fallthrough)
+  int does_have_Clang_fallthrough();
+#endif
+
+// CHECK: has_gnu_const
+#if __has_cpp_attribute(__gnu__::__const__)
+  int has_gnu_const();
 #endif
 
 // Test that C++11, target-specific attributes behave properly.
@@ -50,6 +70,16 @@
 // CHECK: has_cxx14_deprecated_vers
 #if __has_cpp_attribute(deprecated) == 201309
   int has_cxx14_deprecated_vers();
+#endif
+
+// CHECK: has_cxx1z_nodiscard
+#if __has_cpp_attribute(nodiscard) == 201603
+  int has_cxx1z_nodiscard();
+#endif
+
+// CHECK: has_cxx1z_fallthrough
+#if __has_cpp_attribute(fallthrough) == 201603
+  int has_cxx1z_fallthrough();
 #endif
 
 // CHECK: has_declspec_uuid

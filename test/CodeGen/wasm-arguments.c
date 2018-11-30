@@ -5,8 +5,8 @@
 
 // Basic argument/attribute tests for WebAssembly
 
-// WEBASSEMBLY32: define void @f0(i32 %i, i32 %j, i64 %k, double %l, double %m)
-// WEBASSEMBLY64: define void @f0(i32 %i, i64 %j, i64 %k, double %l, double %m)
+// WEBASSEMBLY32: define void @f0(i32 %i, i32 %j, i64 %k, double %l, fp128 %m)
+// WEBASSEMBLY64: define void @f0(i32 %i, i64 %j, i64 %k, double %l, fp128 %m)
 void f0(int i, long j, long long k, double l, long double m) {}
 
 typedef struct {
@@ -24,7 +24,7 @@ typedef struct {
 // Single-element structs should be returned as the one element.
 // WEBASSEMBLY32: define i32 @f2()
 // WEBASSEMBLY64: define i32 @f2()
-s2 f2() {
+s2 f2(void) {
   s2 foo;
   return foo;
 }
@@ -36,7 +36,7 @@ typedef struct {
 // Structs should be returned sret and not simplified by the frontend.
 // WEBASSEMBLY32: define void @f3(%struct.s3* noalias sret %agg.result)
 // WEBASSEMBLY64: define void @f3(%struct.s3* noalias sret %agg.result)
-s3 f3() {
+s3 f3(void) {
   s3 foo;
   return foo;
 }
@@ -53,7 +53,6 @@ void f5(char a, short b) {}
 // WEBASSEMBLY32: define void @f6(i8 zeroext %a, i16 zeroext %b)
 // WEBASSEMBLY64: define void @f6(i8 zeroext %a, i16 zeroext %b)
 void f6(unsigned char a, unsigned short b) {}
-
 
 enum my_enum {
   ENUM1,

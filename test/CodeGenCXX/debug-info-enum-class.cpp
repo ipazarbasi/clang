@@ -4,6 +4,7 @@ enum class A { A1=1 };                 // underlying type is int by default
 enum class B: unsigned long { B1=1 };  // underlying type is unsigned long
 enum C { C1 = 1 };
 enum D : short; // enum forward declaration
+enum Z : int;
 A a;
 B b;
 C c;
@@ -12,23 +13,23 @@ D d;
 // CHECK: !DICompositeType(tag: DW_TAG_enumeration_type, name: "A"
 // CHECK-SAME:             line: 3
 // CHECK-SAME:             baseType: ![[INT:[0-9]+]]
-// CHECK-SAME:             size: 32, align: 32
+// CHECK-SAME:             size: 32
 // CHECK-NOT:              offset:
-// CHECK-NOT:              flags:
+// CHECK-SAME:             flags: DIFlagFixedEnum
 // CHECK-SAME:             ){{$}}
 // CHECK: ![[INT]] = !DIBasicType(name: "int"
 // CHECK: !DICompositeType(tag: DW_TAG_enumeration_type, name: "B"
 // CHECK-SAME:             line: 4
 // CHECK-SAME:             baseType: ![[ULONG:[0-9]+]]
-// CHECK-SAME:             size: 64, align: 64
+// CHECK-SAME:             size: 64
 // CHECK-NOT:              offset:
-// CHECK-NOT:              flags:
+// CHECK-SAME:             flags: DIFlagFixedEnum
 // CHECK-SAME:             ){{$}}
 // CHECK: ![[ULONG]] = !DIBasicType(name: "long unsigned int"
 // CHECK: !DICompositeType(tag: DW_TAG_enumeration_type, name: "C"
 // CHECK-SAME:             line: 5
-// CHECK-NOT:              baseType:
-// CHECK-SAME:             size: 32, align: 32
+// CHECK-SAME:             baseType: ![[ULONG:[0-9]+]]
+// CHECK-SAME:             size: 32
 // CHECK-NOT:              offset:
 // CHECK-NOT:              flags:
 // CHECK-SAME:             ){{$}}
@@ -90,16 +91,21 @@ void f2(E) {
 
 // CHECK: !DICompositeType(tag: DW_TAG_enumeration_type, name: "D"
 // CHECK-SAME:             line: 6
-// CHECK-SAME:             size: 16, align: 16
+// CHECK-SAME:             size: 16
 // CHECK-NOT:              offset:
 // CHECK-SAME:             flags: DIFlagFwdDecl
 
+// CHECK: !DICompositeType(tag: DW_TAG_enumeration_type, name: "Z"
+// CHECK-NOT:              scope:
+// CHECK-SAME:             flags: DIFlagFwdDecl
+void fz() { Z z; }
+
 namespace test5 {
+// CHECK: [[TEST5:![0-9]+]] = !DINamespace(name: "test5"
 // CHECK: !DICompositeType(tag: DW_TAG_enumeration_type, name: "E"
-// CHECK-SAME:             scope: [[TEST5:![0-9]+]]
+// CHECK-SAME:             scope: [[TEST5]]
 // CHECK-SAME:             flags: DIFlagFwdDecl
 // CHECK-SAME:             identifier: "_ZTSN5test51EE"
-// CHECK: [[TEST5]] = !DINamespace(name: "test5"
 enum E : int;
 void f1(E *) {
 }

@@ -1,12 +1,14 @@
 // RUN: %clang_cc1 -verify -fopenmp -ferror-limit 100 -std=c++11 -o - %s
 
+// RUN: %clang_cc1 -verify -fopenmp-simd -ferror-limit 100 -std=c++11 -o - %s
+
 void foo() {
 }
 
 #pragma omp task // expected-error {{unexpected OpenMP directive '#pragma omp task'}}
 
 class S {
-  S(const S &s) { a = s.a + 12; } // expected-note 10 {{implicitly declared private here}}
+  S(const S &s) { a = s.a + 12; } // expected-note 14 {{implicitly declared private here}}
   int a;
 
 public:
@@ -38,21 +40,21 @@ int foo() {
   ++s1;
 #pragma omp task default(none)
 #pragma omp task default(shared)
-  ++a;
+  ++a; // expected-error 2 {{variable 'a' must have explicitly specified data sharing attributes}}
 #pragma omp task default(none)
 #pragma omp task
   // expected-error@+1 {{calling a private constructor of class 'S'}}
-  ++a;
+  ++a; // expected-error 2 {{variable 'a' must have explicitly specified data sharing attributes}}
 #pragma omp task
 #pragma omp task
   // expected-error@+1 {{calling a private constructor of class 'S'}}
-  ++a;
+  ++a; // expected-error {{calling a private constructor of class 'S'}}
 #pragma omp task default(shared)
 #pragma omp task
   ++a;
 #pragma omp task
 #pragma omp parallel
-  ++a;
+  ++a; // expected-error {{calling a private constructor of class 'S'}}
 // expected-error@+2 {{calling a private constructor of class 'S'}}
 #pragma omp task
   ++b;
@@ -60,11 +62,10 @@ int foo() {
 // expected-error@+1 2 {{calling a private constructor of class 'S'}}
 #pragma omp parallel shared(a, b)
   ++a, ++b;
-// expected-note@+1 3 {{defined as reduction}}
+// expected-note@+1 2 {{defined as reduction}}
 #pragma omp parallel reduction(+ : r)
-// expected-error@+1 {{argument of a reduction clause of a parallel construct must not appear in a firstprivate clause on a task construct}}
+// expected-error@+1 2 {{argument of a reduction clause of a parallel construct must not appear in a firstprivate clause on a task construct}}
 #pragma omp task firstprivate(r)
-  // expected-error@+1 2 {{reduction variables may not be accessed in an explicit task}}
   ++r;
 // expected-note@+1 2 {{defined as reduction}}
 #pragma omp parallel reduction(+ : r)
@@ -77,12 +78,11 @@ int foo() {
   // expected-error@+1 2 {{reduction variables may not be accessed in an explicit task}}
   ++r;
 #pragma omp parallel
-// expected-note@+1 3 {{defined as reduction}}
+// expected-note@+1 2 {{defined as reduction}}
 #pragma omp for reduction(+ : r)
   for (int i = 0; i < 10; ++i)
-// expected-error@+1 {{argument of a reduction clause of a for construct must not appear in a firstprivate clause on a task construct}}
+// expected-error@+1 2 {{argument of a reduction clause of a for construct must not appear in a firstprivate clause on a task construct}}
 #pragma omp task firstprivate(r)
-    // expected-error@+1 2 {{reduction variables may not be accessed in an explicit task}}
     ++r;
 #pragma omp parallel
 // expected-note@+1 2 {{defined as reduction}}
@@ -177,10 +177,10 @@ L2:
 
 #pragma omp task default(none)
 #pragma omp task default(shared)
-  ++a;
+  ++a; // expected-error {{variable 'a' must have explicitly specified data sharing attributes}}
 #pragma omp task default(none)
 #pragma omp task
-  ++a;
+  ++a; // expected-error {{variable 'a' must have explicitly specified data sharing attributes}}
 #pragma omp task default(shared)
 #pragma omp task
   ++a;
@@ -194,21 +194,21 @@ L2:
   ++a, ++b;
 #pragma omp task default(none)
 #pragma omp task default(shared)
-  ++sa;
+  ++sa; // expected-error {{variable 'sa' must have explicitly specified data sharing attributes}}
 #pragma omp task default(none)
 #pragma omp task
   // expected-error@+1 {{calling a private constructor of class 'S'}}
-  ++sa;
+  ++sa; // expected-error {{variable 'sa' must have explicitly specified data sharing attributes}}
 #pragma omp task
 #pragma omp task
   // expected-error@+1 {{calling a private constructor of class 'S'}}
-  ++sa;
+  ++sa; // expected-error {{calling a private constructor of class 'S'}}
 #pragma omp task default(shared)
 #pragma omp task
   ++sa;
 #pragma omp task
 #pragma omp parallel
-  ++sa;
+  ++sa; // expected-error {{calling a private constructor of class 'S'}}
 // expected-error@+2 {{calling a private constructor of class 'S'}}
 #pragma omp task
   ++sb;

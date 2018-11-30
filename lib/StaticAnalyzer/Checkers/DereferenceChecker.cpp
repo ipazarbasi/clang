@@ -34,8 +34,7 @@ class DereferenceChecker
   mutable std::unique_ptr<BuiltinBug> BT_null;
   mutable std::unique_ptr<BuiltinBug> BT_undef;
 
-  void reportBug(ProgramStateRef State, const Stmt *S, CheckerContext &C,
-                 bool IsBind = false) const;
+  void reportBug(ProgramStateRef State, const Stmt *S, CheckerContext &C) const;
 
 public:
   void checkLocation(SVal location, bool isLoad, const Stmt* S,
@@ -89,8 +88,37 @@ DereferenceChecker::AddDerefSource(raw_ostream &os,
   }
 }
 
+static const Expr *getDereferenceExpr(const Stmt *S, bool IsBind=false){
+  const Expr *E = nullptr;
+
+  // Walk through lvalue casts to get the original expression
+  // that syntactically caused the load.
+  if (const Expr *expr = dyn_cast<Expr>(S))
+    E = expr->IgnoreParenLValueCasts();
+
+  if (IsBind) {
+    const VarDecl *VD;
+    const Expr *Init;
+    std::tie(VD, Init) = parseAssignment(S);
+    if (VD && Init)
+      E = Init;
+  }
+  return E;
+}
+
+static bool suppressReport(const Expr *E) {
+  // Do not report dereferences on memory in non-default address spaces.
+  return E->getType().getQualifiers().hasAddressSpace();
+}
+
+static bool isDeclRefExprToReference(const Expr *E) {
+  if (const auto *DRE = dyn_cast<DeclRefExpr>(E))
+    return DRE->getDecl()->getType()->isReferenceType();
+  return false;
+}
+
 void DereferenceChecker::reportBug(ProgramStateRef State, const Stmt *S,
-                                   CheckerContext &C, bool IsBind) const {
+                                   CheckerContext &C) const {
   // Generate an error node.
   ExplodedNode *N = C.generateErrorNode(State);
   if (!N)
@@ -105,19 +133,6 @@ void DereferenceChecker::reportBug(ProgramStateRef State, const Stmt *S,
   llvm::raw_svector_ostream os(buf);
 
   SmallVector<SourceRange, 2> Ranges;
-
-  // Walk through lvalue casts to get the original expression
-  // that syntactically caused the load.
-  if (const Expr *expr = dyn_cast<Expr>(S))
-    S = expr->IgnoreParenLValueCasts();
-
-  if (IsBind) {
-    const VarDecl *VD;
-    const Expr *Init;
-    std::tie(VD, Init) = parseAssignment(S);
-    if (VD && Init)
-      S = Init;
-  }
 
   switch (S->getStmtClass()) {
   case Stmt::ArraySubscriptExprClass: {
@@ -145,7 +160,7 @@ void DereferenceChecker::reportBug(ProgramStateRef State, const Stmt *S,
   }
   case Stmt::MemberExprClass: {
     const MemberExpr *M = cast<MemberExpr>(S);
-    if (M->isArrow() || bugreporter::isDeclRefExprToReference(M->getBase())) {
+    if (M->isArrow() || isDeclRefExprToReference(M->getBase())) {
       os << "Access to field '" << M->getMemberNameInfo()
          << "' results in a dereference of a null pointer";
       AddDerefSource(os, Ranges, M->getBase()->IgnoreParenCasts(),
@@ -168,7 +183,7 @@ void DereferenceChecker::reportBug(ProgramStateRef State, const Stmt *S,
   auto report = llvm::make_unique<BugReport>(
       *BT_null, buf.empty() ? BT_null->getDescription() : StringRef(buf), N);
 
-  bugreporter::trackNullOrUndefValue(N, bugreporter::getDerefExpr(S), *report);
+  bugreporter::trackExpressionValue(N, bugreporter::getDerefExpr(S), *report);
 
   for (SmallVectorImpl<SourceRange>::iterator
        I = Ranges.begin(), E = Ranges.end(); I!=E; ++I)
@@ -188,8 +203,7 @@ void DereferenceChecker::checkLocation(SVal l, bool isLoad, const Stmt* S,
 
       auto report =
           llvm::make_unique<BugReport>(*BT_undef, BT_undef->getDescription(), N);
-      bugreporter::trackNullOrUndefValue(N, bugreporter::getDerefExpr(S),
-                                         *report);
+      bugreporter::trackExpressionValue(N, bugreporter::getDerefExpr(S), *report);
       C.emitReport(std::move(report));
     }
     return;
@@ -209,8 +223,11 @@ void DereferenceChecker::checkLocation(SVal l, bool isLoad, const Stmt* S,
   // The explicit NULL case.
   if (nullState) {
     if (!notNullState) {
-      reportBug(nullState, S, C);
-      return;
+      const Expr *expr = getDereferenceExpr(S);
+      if (!suppressReport(expr)) {
+        reportBug(nullState, expr, C);
+        return;
+      }
     }
 
     // Otherwise, we have the case where the location could either be
@@ -218,7 +235,7 @@ void DereferenceChecker::checkLocation(SVal l, bool isLoad, const Stmt* S,
     // dereference.
     if (ExplodedNode *N = C.generateSink(nullState, C.getPredecessor())) {
       ImplicitNullDerefEvent event = {l, isLoad, N, &C.getBugReporter(),
-                                      /*IsDirectDereference=*/false};
+                                      /*IsDirectDereference=*/true};
       dispatchEvent(event);
     }
   }
@@ -248,8 +265,11 @@ void DereferenceChecker::checkBind(SVal L, SVal V, const Stmt *S,
 
   if (StNull) {
     if (!StNonNull) {
-      reportBug(StNull, S, C, /*isBind=*/true);
-      return;
+      const Expr *expr = getDereferenceExpr(S, /*IsBind=*/true);
+      if (!suppressReport(expr)) {
+        reportBug(StNull, expr, C);
+        return;
+      }
     }
 
     // At this point the value could be either null or non-null.
@@ -257,7 +277,7 @@ void DereferenceChecker::checkBind(SVal L, SVal V, const Stmt *S,
     if (ExplodedNode *N = C.generateSink(StNull, C.getPredecessor())) {
       ImplicitNullDerefEvent event = {V, /*isLoad=*/true, N,
                                       &C.getBugReporter(),
-                                      /*IsDirectDereference=*/false};
+                                      /*IsDirectDereference=*/true};
       dispatchEvent(event);
     }
   }

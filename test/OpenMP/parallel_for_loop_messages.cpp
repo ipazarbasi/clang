@@ -1,5 +1,7 @@
 // RUN: %clang_cc1 -fsyntax-only -fopenmp -x c++ -std=c++11 -fexceptions -fcxx-exceptions -verify %s
 
+// RUN: %clang_cc1 -fsyntax-only -fopenmp-simd -x c++ -std=c++11 -fexceptions -fcxx-exceptions -verify %s
+
 class S {
   int a;
   S() : a(0) {}
@@ -10,6 +12,7 @@ public:
 };
 
 static int sii;
+// expected-note@+1 {{defined as threadprivate or thread local}}
 #pragma omp threadprivate(sii)
 static int globalii;
 
@@ -105,7 +108,7 @@ int test_iteration_spaces() {
   for (int i = 0; !!i; i++)
     c[i] = a[i];
 
-// expected-error@+2 {{condition of OpenMP for loop must be a relational comparison ('<', '<=', '>', or '>=') of loop variable 'i'}}
+// Ok
 #pragma omp parallel for
   for (int i = 0; i != 1; i++)
     c[i] = a[i];
@@ -257,6 +260,7 @@ int test_iteration_spaces() {
     c[ii] = a[ii];
 
   {
+// expected-error@+2 {{loop iteration variable in the associated loop of 'omp parallel for' directive may not be threadprivate or thread local, predetermined as private}}
 #pragma omp parallel for
     for (sii = 0; sii < 10; sii += 1)
       c[sii] = a[sii];
@@ -352,12 +356,12 @@ public:
   typedef int difference_type;
   typedef std::random_access_iterator_tag iterator_category;
 };
-// expected-note@+2 {{candidate function not viable: no known conversion from 'Iter0' to 'GoodIter' for 2nd argument}}
+// expected-note@+2 {{candidate function not viable: no known conversion from 'const Iter0' to 'GoodIter' for 2nd argument}}
 // expected-note@+1 2 {{candidate function not viable: no known conversion from 'Iter1' to 'GoodIter' for 1st argument}}
 int operator-(GoodIter a, GoodIter b) { return 0; }
 // expected-note@+1 3 {{candidate function not viable: requires single argument 'a', but 2 arguments were provided}}
 GoodIter operator-(GoodIter a) { return a; }
-// expected-note@+2 {{candidate function not viable: no known conversion from 'Iter0' to 'int' for 2nd argument}}
+// expected-note@+2 {{candidate function not viable: no known conversion from 'const Iter0' to 'int' for 2nd argument}}
 // expected-note@+1 2 {{candidate function not viable: no known conversion from 'Iter1' to 'GoodIter' for 1st argument}}
 GoodIter operator-(GoodIter a, int v) { return GoodIter(); }
 // expected-note@+1 2 {{candidate function not viable: no known conversion from 'Iter0' to 'GoodIter' for 1st argument}}
@@ -400,7 +404,7 @@ int test_with_random_access_iterator() {
 #pragma omp parallel for
   for (begin = GoodIter(0); begin < end; ++begin)
     ++begin;
-// expected-error@+3 {{invalid operands to binary expression ('GoodIter' and 'Iter0')}}
+// expected-error@+3 {{invalid operands to binary expression ('GoodIter' and 'const Iter0')}}
 // expected-error@+2 {{could not calculate number of iterations calling 'operator-' with upper and lower loop bounds}}
 #pragma omp parallel for
   for (begin = begin0; begin < end; ++begin)
@@ -537,7 +541,7 @@ void test_with_template() {
   t1.dotest_lt(begin, end);
   t2.dotest_lt(begin, end);         // expected-note {{in instantiation of member function 'TC<GoodIter, -100>::dotest_lt' requested here}}
   dotest_gt(begin, end);            // expected-note {{in instantiation of function template specialization 'dotest_gt<GoodIter, 0>' requested here}}
-  dotest_gt<unsigned, -10>(0, 100); // expected-note {{in instantiation of function template specialization 'dotest_gt<unsigned int, -10>' requested here}}
+  dotest_gt<unsigned, 10>(0, 100);  // expected-note {{in instantiation of function template specialization 'dotest_gt<unsigned int, 10>' requested here}}
 }
 
 void test_loop_break() {

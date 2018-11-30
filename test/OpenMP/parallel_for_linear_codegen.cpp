@@ -3,8 +3,14 @@
 // RUN: %clang_cc1 -fopenmp -x c++ -triple x86_64-apple-darwin10 -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck %s
 // RUN: %clang_cc1 -verify -fopenmp -x c++ -std=c++11 -DLAMBDA -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck -check-prefix=LAMBDA %s
 // RUN: %clang_cc1 -verify -fopenmp -x c++ -fblocks -DBLOCKS -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck -check-prefix=BLOCKS %s
+
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -std=c++11 -triple x86_64-apple-darwin10 -emit-pch -o %t %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -triple x86_64-apple-darwin10 -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -std=c++11 -DLAMBDA -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -fblocks -DBLOCKS -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// SIMD-ONLY0-NOT: {{__kmpc|__tgt}}
 // expected-no-diagnostics
-// REQUIRES: x86-registered-target
 #ifndef HEADER
 #define HEADER
 
@@ -24,7 +30,6 @@ char cnt;
 
 // CHECK: [[S_FLOAT_TY:%.+]] = type { float }
 // CHECK: [[S_INT_TY:%.+]] = type { i32 }
-// CHECK-DAG: [[IMPLICIT_BARRIER_LOC:@.+]] = private unnamed_addr constant %{{.+}} { i32 0, i32 66, i32 0, i32 0, i8*
 // CHECK-DAG: [[F:@.+]] = global float 0.0
 // CHECK-DAG: [[CNT:@.+]] = global i8 0
 template <typename T>
@@ -51,6 +56,7 @@ int main() {
   for (int i = 0; i < 2; ++i) {
     // LAMBDA: define{{.*}} internal{{.*}} void [[OMP_REGION]](i32* noalias %{{.+}}, i32* noalias %{{.+}}, i32* dereferenceable(4) %{{.+}})
     // LAMBDA: alloca i{{[0-9]+}},
+    // LAMBDA: alloca i{{[0-9]+}},
     // LAMBDA: [[G_START_ADDR:%.+]] = alloca i{{[0-9]+}},
     // LAMBDA: alloca i{{[0-9]+}},
     // LAMBDA: alloca i{{[0-9]+}},
@@ -75,7 +81,6 @@ int main() {
     // LAMBDA: call void [[INNER_LAMBDA:@.+]](%{{.+}}* [[ARG]])
     // LAMBDA: call void @__kmpc_for_static_fini(%{{.+}}* @{{.+}}, i32 [[GTID]])
     g += 5;
-    // LAMBDA: call void @__kmpc_barrier(%{{.+}}* @{{.+}}, i{{[0-9]+}} [[GTID]])
     [&]() {
       // LAMBDA: define {{.+}} void [[INNER_LAMBDA]](%{{.+}}* [[ARG_PTR:%.+]])
       // LAMBDA: store %{{.+}}* [[ARG_PTR]], %{{.+}}** [[ARG_PTR_REF:%.+]],
@@ -98,6 +103,7 @@ int main() {
 #pragma omp parallel for linear(g:5)
   for (int i = 0; i < 2; ++i) {
     // BLOCKS: define{{.*}} internal{{.*}} void [[OMP_REGION]](i32* noalias %{{.+}}, i32* noalias %{{.+}}, i32* dereferenceable(4) %{{.+}})
+    // BLOCKS: alloca i{{[0-9]+}},
     // BLOCKS: alloca i{{[0-9]+}},
     // BLOCKS: [[G_START_ADDR:%.+]] = alloca i{{[0-9]+}},
     // BLOCKS: alloca i{{[0-9]+}},
@@ -124,7 +130,6 @@ int main() {
     // BLOCKS: call void {{%.+}}(i8
     // BLOCKS: call void @__kmpc_for_static_fini(%{{.+}}* @{{.+}}, i32 [[GTID]])
     g += 5;
-    // BLOCKS: call void @__kmpc_barrier(%{{.+}}* @{{.+}}, i{{[0-9]+}} [[GTID]])
     g = 1;
     ^{
       // BLOCKS: define {{.+}} void {{@.+}}(i8*
@@ -159,9 +164,9 @@ int main() {
 
 // CHECK: define internal void [[MAIN_MICROTASK]](i{{[0-9]+}}* noalias [[GTID_ADDR:%.+]], i{{[0-9]+}}* noalias %{{.+}}, float** dereferenceable(8) %{{.+}}, i64* dereferenceable(8) %{{.+}})
 // CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
 // CHECK: [[PVAR_START:%.+]] = alloca float*,
 // CHECK: [[LVAR_START:%.+]] = alloca i64,
-// CHECK: alloca i{{[0-9]+}},
 // CHECK: alloca i{{[0-9]+}},
 // CHECK: alloca i{{[0-9]+}},
 // CHECK: alloca i{{[0-9]+}},
@@ -198,7 +203,6 @@ int main() {
 // CHECK: [[ADD:%.+]] = add nsw i64 [[LVAR_VAL]], 3
 // CHECK: store i64 [[ADD]], i64* [[LVAR_PRIV]],
 // CHECK: call void @__kmpc_for_static_fini(%{{.+}}* @{{.+}}, i32 %{{.+}})
-// CHECK: call void @__kmpc_barrier(%{{.+}}* [[IMPLICIT_BARRIER_LOC]], i{{[0-9]+}} [[GTID]])
 // CHECK: ret void
 
 // CHECK: define {{.*}} i{{[0-9]+}} [[TMAIN_INT]]()
@@ -210,9 +214,9 @@ int main() {
 //
 // CHECK: define internal void [[TMAIN_MICROTASK]](i{{[0-9]+}}* noalias [[GTID_ADDR:%.+]], i{{[0-9]+}}* noalias %{{.+}}, i32** dereferenceable(8) %{{.+}}, i32* dereferenceable(4) %{{.+}})
 // CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
 // CHECK: [[PVAR_START:%.+]] = alloca i32*,
 // CHECK: [[LVAR_START:%.+]] = alloca i32,
-// CHECK: alloca i{{[0-9]+}},
 // CHECK: alloca i{{[0-9]+}},
 // CHECK: alloca i{{[0-9]+}},
 // CHECK: alloca i{{[0-9]+}},
@@ -248,7 +252,6 @@ int main() {
 // CHECK: [[ADD:%.+]] = add nsw i32 [[LVAR_VAL]], 1
 // CHECK: store i32 [[ADD]], i32* [[LVAR_PRIV]],
 // CHECK: call void @__kmpc_for_static_fini(%{{.+}}* @{{.+}}, i32 %{{.+}})
-// CHECK: call void @__kmpc_barrier(%{{.+}}* [[IMPLICIT_BARRIER_LOC]], i{{[0-9]+}} [[GTID]])
 // CHECK: ret void
 #endif
 

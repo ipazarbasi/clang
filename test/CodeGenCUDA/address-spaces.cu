@@ -1,4 +1,5 @@
 // RUN: %clang_cc1 -emit-llvm %s -o - -fcuda-is-device -triple nvptx-unknown-unknown | FileCheck %s
+// RUN: %clang_cc1 -emit-llvm %s -o - -fcuda-is-device -triple amdgcn | FileCheck %s
 
 // Verifies Clang emits correct address spaces and addrspacecast instructions
 // for CUDA code.
@@ -19,14 +20,12 @@ struct MyStruct {
   int data2;
 };
 
-// CHECK: @_ZZ5func0vE1a = internal addrspace(3) global %struct.MyStruct zeroinitializer
-// CHECK: @_ZZ5func1vE1a = internal addrspace(3) global float 0.000000e+00
-// CHECK: @_ZZ5func2vE1a = internal addrspace(3) global [256 x float] zeroinitializer
-// CHECK: @_ZZ5func3vE1a = internal addrspace(3) global float 0.000000e+00
-// CHECK: @_ZZ5func4vE1a = internal addrspace(3) global float 0.000000e+00
+// CHECK: @_ZZ5func0vE1a = internal addrspace(3) global %struct.MyStruct undef
+// CHECK: @_ZZ5func1vE1a = internal addrspace(3) global float undef
+// CHECK: @_ZZ5func2vE1a = internal addrspace(3) global [256 x float] undef
+// CHECK: @_ZZ5func3vE1a = internal addrspace(3) global float undef
+// CHECK: @_ZZ5func4vE1a = internal addrspace(3) global float undef
 // CHECK: @b = addrspace(3) global float undef
-// CHECK: @c = addrspace(3) global %struct.c undef
-// CHECK  @d = addrspace(3) global %struct.d undef
 
 __device__ void foo() {
   // CHECK: load i32, i32* addrspacecast (i32 addrspace(1)* @i to i32*)
@@ -37,14 +36,6 @@ __device__ void foo() {
 
   // CHECK: load i32, i32* addrspacecast (i32 addrspace(3)* @k to i32*)
   k++;
-
-  static int li;
-  // CHECK: load i32, i32* addrspacecast (i32 addrspace(1)* @_ZZ3foovE2li to i32*)
-  li++;
-
-  __constant__ int lj;
-  // CHECK: load i32, i32* addrspacecast (i32 addrspace(4)* @_ZZ3foovE2lj to i32*)
-  lj++;
 
   __shared__ int lk;
   // CHECK: load i32, i32* addrspacecast (i32 addrspace(3)* @_ZZ3foovE2lk to i32*)
@@ -58,7 +49,7 @@ __device__ void func0() {
   ap->data2 = 2;
 }
 // CHECK: define void @_Z5func0v()
-// CHECK: store %struct.MyStruct* addrspacecast (%struct.MyStruct addrspace(3)* @_ZZ5func0vE1a to %struct.MyStruct*), %struct.MyStruct** %ap
+// CHECK: store %struct.MyStruct* addrspacecast (%struct.MyStruct addrspace(3)* @_ZZ5func0vE1a to %struct.MyStruct*), %struct.MyStruct** %{{.*}}
 
 __device__ void callee(float *ap) {
   *ap = 1.0f;
@@ -77,7 +68,7 @@ __device__ void func2() {
   *ap = 1.0f;
 }
 // CHECK: define void @_Z5func2v()
-// CHECK: store float* getelementptr inbounds ([256 x float], [256 x float]* addrspacecast ([256 x float] addrspace(3)* @_ZZ5func2vE1a to [256 x float]*), i32 0, i32 128), float** %ap
+// CHECK: store float* getelementptr inbounds ([256 x float], [256 x float]* addrspacecast ([256 x float] addrspace(3)* @_ZZ5func2vE1a to [256 x float]*), i{{32|64}} 0, i{{32|64}} 128), float** %{{.*}}
 
 __device__ void func3() {
   __shared__ float a;
@@ -85,7 +76,7 @@ __device__ void func3() {
   *ap = 1.0f;
 }
 // CHECK: define void @_Z5func3v()
-// CHECK: store float* addrspacecast (float addrspace(3)* @_ZZ5func3vE1a to float*), float** %ap
+// CHECK: store float* addrspacecast (float addrspace(3)* @_ZZ5func3vE1a to float*), float** %{{.*}}
 
 __device__ void func4() {
   __shared__ float a;
@@ -93,7 +84,7 @@ __device__ void func4() {
   *ap = 1.0f;
 }
 // CHECK: define void @_Z5func4v()
-// CHECK: store float* addrspacecast (float addrspace(3)* @_ZZ5func4vE1a to float*), float** %ap
+// CHECK: store float* addrspacecast (float addrspace(3)* @_ZZ5func4vE1a to float*), float** %{{.*}}
 
 __shared__ float b;
 
@@ -102,32 +93,3 @@ __device__ float *func5() {
 }
 // CHECK: define float* @_Z5func5v()
 // CHECK: ret float* addrspacecast (float addrspace(3)* @b to float*)
-
-struct StructWithCtor {
-  __device__ StructWithCtor(): data(1) {}
-  __device__ StructWithCtor(const StructWithCtor &second): data(second.data) {}
-  __device__ int getData() { return data; }
-  int data;
-};
-
-__device__ int construct_shared_struct() {
-// CHECK-LABEL: define i32 @_Z23construct_shared_structv()
-  __shared__ StructWithCtor s;
-// CHECK: call void @_ZN14StructWithCtorC1Ev(%struct.StructWithCtor* addrspacecast (%struct.StructWithCtor addrspace(3)* @_ZZ23construct_shared_structvE1s to %struct.StructWithCtor*))
-  __shared__ StructWithCtor t(s);
-// CHECK: call void @_ZN14StructWithCtorC1ERKS_(%struct.StructWithCtor* addrspacecast (%struct.StructWithCtor addrspace(3)* @_ZZ23construct_shared_structvE1t to %struct.StructWithCtor*), %struct.StructWithCtor* dereferenceable(4) addrspacecast (%struct.StructWithCtor addrspace(3)* @_ZZ23construct_shared_structvE1s to %struct.StructWithCtor*))
-  return t.getData();
-// CHECK: call i32 @_ZN14StructWithCtor7getDataEv(%struct.StructWithCtor* addrspacecast (%struct.StructWithCtor addrspace(3)* @_ZZ23construct_shared_structvE1t to %struct.StructWithCtor*))
-}
-
-// Make sure we allow __shared__ structures with default or empty constructors.
-struct c {
-  int i;
-};
-__shared__ struct c c;
-
-struct d {
-  int i;
-  d() {}
-};
-__shared__ struct d d;

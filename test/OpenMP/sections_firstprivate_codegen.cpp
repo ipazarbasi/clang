@@ -3,8 +3,14 @@
 // RUN: %clang_cc1 -fopenmp -x c++ -triple x86_64-apple-darwin10 -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck %s
 // RUN: %clang_cc1 -verify -fopenmp -x c++ -std=c++11 -DLAMBDA -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck -check-prefix=LAMBDA %s
 // RUN: %clang_cc1 -verify -fopenmp -x c++ -fblocks -DBLOCKS -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck -check-prefix=BLOCKS %s
+
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -std=c++11 -triple x86_64-apple-darwin10 -emit-pch -o %t %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -triple x86_64-apple-darwin10 -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -std=c++11 -DLAMBDA -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -fblocks -DBLOCKS -triple x86_64-apple-darwin10 -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// SIMD-ONLY0-NOT: {{__kmpc|__tgt}}
 // expected-no-diagnostics
-// REQUIRES: x86-registered-target
 #ifndef HEADER
 #define HEADER
 
@@ -59,8 +65,7 @@ S<float> s_arr[] = {1, 2};
 // CHECK-DAG: [[VAR:@.+]] = global [[S_FLOAT_TY]] zeroinitializer,
 S<float> var(3);
 // CHECK-DAG: [[SIVAR:@.+]] = internal global i{{[0-9]+}} 0,
-// CHECK-DAG: [[IMPLICIT_BARRIER_LOC:@.+]] = private unnamed_addr constant %{{.+}} { i32 0, i32 66, i32 0, i32 0, i8*
-// CHECK-DAG: [[SECTIONS_BARRIER_LOC:@.+]] = private unnamed_addr constant %{{.+}} { i32 0, i32 194, i32 0, i32 0, i8*
+// CHECK-DAG: [[SECTIONS_BARRIER_LOC:@.+]] = private unnamed_addr global %{{.+}} { i32 0, i32 194, i32 0, i32 0, i8*
 
 // CHECK: call {{.*}} [[S_FLOAT_TY_DEF_CONSTR:@.+]]([[S_FLOAT_TY]]* [[TEST]])
 // CHECK: ([[S_FLOAT_TY]]*)* [[S_FLOAT_TY_DESTR:@[^ ]+]] {{[^,]+}}, {{.+}}([[S_FLOAT_TY]]* [[TEST]]
@@ -94,7 +99,7 @@ int main() {
     // LAMBDA: [[SIVAR1_VAL:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}* [[SIVAR1_REF]]
     // LAMBDA: store i{{[0-9]+}} [[SIVAR1_VAL]], i{{[0-9]+}}* [[SIVAR1_PRIVATE_ADDR]]
 
-    // LAMBDA: call void @__kmpc_barrier(
+    // LAMBDA-NOT: call void @__kmpc_barrier(
     {
       g = 1;
       sivar = 10;
@@ -154,7 +159,7 @@ int main() {
 
     // BLOCKS: [[SIVAR1_VAL:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}* [[SIVAR1_REF]],
     // BLOCKS: store i{{[0-9]+}} [[SIVAR1_VAL]], i{{[0-9]+}}* [[SIVAR1_PRIVATE_ADDR]],
-    // BLOCKS: call void @__kmpc_barrier(
+    // BLOCKS-NOT: call void @__kmpc_barrier(
     {
       g = 1;
       sivar = 10;
@@ -202,20 +207,25 @@ int main() {
 
 // CHECK: define {{.*}}i{{[0-9]+}} @main()
 // CHECK: alloca i{{[0-9]+}},
-// CHECK: [[GTID:%.+]] = call i32 @__kmpc_global_thread_num(
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
 // CHECK: [[T_VAR_PRIV:%.+]] = alloca i{{[0-9]+}},
 // CHECK: [[VEC_PRIV:%.+]] = alloca [2 x i{{[0-9]+}}],
 // CHECK: [[S_ARR_PRIV:%.+]] = alloca [2 x [[S_FLOAT_TY]]],
 // CHECK: [[VAR_PRIV:%.+]] = alloca [[S_FLOAT_TY]],
 // CHECK: [[SIVAR_PRIV:%.+]] = alloca i{{[0-9]+}},
+// CHECK: [[GTID:%.+]] = call i32 @__kmpc_global_thread_num(
 
-// CHECK: call i32 @__kmpc_single(
 // firstprivate t_var(t_var)
 // CHECK: [[T_VAR_VAL:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}* [[T_VAR]],
 // CHECK: store i{{[0-9]+}} [[T_VAR_VAL]], i{{[0-9]+}}* [[T_VAR_PRIV]],
+
 // firstprivate vec(vec)
 // CHECK: [[VEC_DEST:%.+]] = bitcast [2 x i{{[0-9]+}}]* [[VEC_PRIV]] to i8*
-// CHECK: call void @llvm.memcpy.{{.+}}(i8* [[VEC_DEST]], i8* bitcast ([2 x i{{[0-9]+}}]* [[VEC]] to i8*),
+// CHECK: call void @llvm.memcpy.{{.+}}(i8* align {{[0-9]+}} [[VEC_DEST]], i8* align {{[0-9]+}} bitcast ([2 x i{{[0-9]+}}]* [[VEC]] to i8*),
 
 // firstprivate s_arr(s_arr)
 // CHECK: [[S_ARR_PRIV_BEGIN:%.+]] = getelementptr inbounds [2 x [[S_FLOAT_TY]]], [2 x [[S_FLOAT_TY]]]* [[S_ARR_PRIV]], i{{[0-9]+}} 0, i{{[0-9]+}} 0
@@ -235,15 +245,16 @@ int main() {
 // CHECK: call {{.*}} [[ST_TY_DESTR]]([[ST_TY]]* [[ST_TY_TEMP]])
 
 // firstprivate isvar
-// CHEC: [[SIVAR_VAL:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}* [[SIVAR]],
-// CHEC: store i{{[0-9]+}} [[SIVAR_VAL]], i{{[0-9]+}}* [[SIVAR_PRIV]],
+// CHECK: [[SIVAR_VAL:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}* [[SIVAR]],
+// CHECK: store i{{[0-9]+}} [[SIVAR_VAL]], i{{[0-9]+}}* [[SIVAR_PRIV]],
+
+// CHECK-NOT: call void @__kmpc_barrier(
+// CHECK: call void @__kmpc_for_static_init_4(
+// CHECK: call void @__kmpc_for_static_fini(
 
 // ~(firstprivate var), ~(firstprivate s_arr)
 // CHECK-DAG: call {{.*}} [[S_FLOAT_TY_DESTR]]([[S_FLOAT_TY]]* [[VAR_PRIV]])
 // CHECK-DAG: call {{.*}} [[S_FLOAT_TY_DESTR]]([[S_FLOAT_TY]]*
-// CHECK: call void @__kmpc_end_single(
-
-// CHECK: call void @__kmpc_barrier(%{{.+}}* [[IMPLICIT_BARRIER_LOC]], i{{[0-9]+}} [[GTID]])
 
 // CHECK: = call {{.*}}i{{.+}} [[TMAIN_INT:@.+]]()
 
@@ -275,13 +286,13 @@ int main() {
 // CHECK: [[VAR_REF:%.+]] = load [[S_INT_TY]]*, [[S_INT_TY]]** %
 
 // firstprivate t_var(t_var)
-// CHECK: [[T_VAR_VAL:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}* [[T_VAR_REF]],
+// CHECK: [[T_VAR_VAL:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}*
 // CHECK: store i{{[0-9]+}} [[T_VAR_VAL]], i{{[0-9]+}}* [[T_VAR_PRIV]],
 
 // firstprivate vec(vec)
 // CHECK: [[VEC_DEST:%.+]] = bitcast [2 x i{{[0-9]+}}]* [[VEC_PRIV]] to i8*
 // CHECK: [[VEC_SRC:%.+]] = bitcast [2 x i{{[0-9]+}}]* [[VEC_REF]] to i8*
-// CHECK: call void @llvm.memcpy.{{.+}}(i8* [[VEC_DEST]], i8* [[VEC_SRC]],
+// CHECK: call void @llvm.memcpy.{{.+}}(i8* align {{[0-9]+}} [[VEC_DEST]], i8* align {{[0-9]+}} [[VEC_SRC]],
 
 // firstprivate s_arr(s_arr)
 // CHECK: [[S_ARR_PRIV_BEGIN:%.+]] = getelementptr inbounds [2 x [[S_INT_TY]]], [2 x [[S_INT_TY]]]* [[S_ARR_PRIV]], i{{[0-9]+}} 0, i{{[0-9]+}} 0
@@ -299,10 +310,8 @@ int main() {
 // CHECK: call {{.*}} [[S_INT_TY_COPY_CONSTR]]([[S_INT_TY]]* [[VAR_PRIV]], [[S_INT_TY]]* {{.*}} [[VAR_REF]], [[ST_TY]]* [[ST_TY_TEMP]])
 // CHECK: call {{.*}} [[ST_TY_DESTR]]([[ST_TY]]* [[ST_TY_TEMP]])
 
-// Synchronization for initialization.
-// CHECK: [[GTID_REF:%.+]] = load i{{[0-9]+}}*, i{{[0-9]+}}** [[GTID_ADDR_ADDR]]
-// CHECK: [[GTID:%.+]] = load i{{[0-9]+}}, i{{[0-9]+}}* [[GTID_REF]]
-// CHECK: call void @__kmpc_barrier(%{{.+}}* [[IMPLICIT_BARRIER_LOC]], i{{[0-9]+}} [[GTID]])
+// No synchronization for initialization.
+// CHECK-NOT: call void @__kmpc_barrier(
 
 // CHECK: call void @__kmpc_for_static_init_4(
 // CHECK: call void @__kmpc_for_static_fini(

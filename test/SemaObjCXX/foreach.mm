@@ -6,15 +6,21 @@
 void f(NSArray *a) {
     id keys;
     for (int i : a); // expected-error{{selector element type 'int' is not a valid object}} 
-    for ((id)2 : a);  // expected-error {{for range declaration must declare a variable}} \
-                      // expected-warning {{expression result unused}}
-    for (2 : a); // expected-error {{for range declaration must declare a variable}} \
-                 // expected-warning {{expression result unused}}
+    for ((id)2 : a);  // expected-error {{for range declaration must declare a variable}}
+    for (2 : a); // expected-error {{for range declaration must declare a variable}}
   
   for (id thisKey : keys);
 
   for (auto thisKey : keys) { } // expected-warning{{'auto' deduced as 'id' in declaration of 'thisKey'}}
 }
+
+void for_init_stmt() {
+  for (id keys; id key : keys) {} // expected-warning{{extension}} expected-error{{not supported}}
+}
+template<typename T> void for_init_stmt_tmpl() {
+  for (T keys; id key : keys) {} // expected-warning{{extension}} expected-error{{not supported}}
+}
+template void for_init_stmt_tmpl<id>(); // expected-note {{in instantiation of}}
 
 template<typename Collection>
 void ft(Collection col) {
@@ -65,8 +71,7 @@ int main ()
 @end
 void test2(NSObject<NSFastEnumeration> *collection) {
   Test2 *obj;
-  for (obj.prop : collection) { // expected-error {{for range declaration must declare a variable}} \
-                                // expected-warning {{property access result unused - getters should not be used for side effects}}
+  for (obj.prop : collection) { // expected-error {{for range declaration must declare a variable}}
   }
 }
 

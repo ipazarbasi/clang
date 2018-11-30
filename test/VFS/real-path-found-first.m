@@ -7,7 +7,7 @@
 // REQUIRES: shell
 // RUN: rm -rf %t %t-cache %t.pch
 // RUN: mkdir -p %t/SomeFramework.framework/Modules
-// RUN: cp %S/Inputs/some_frame_module.map %t/SomeFramework.framework/Modules/module.modulemap
+// RUN: cat %S/Inputs/some_frame_module.map > %t/SomeFramework.framework/Modules/module.modulemap
 // RUN: sed -e "s:INPUT_DIR:%S/Inputs:g" -e "s:OUT_DIR:%t:g" %S/Inputs/vfsoverlay.yaml > %t.yaml
 
 // Build
@@ -70,5 +70,6 @@
 #ifndef WITH_PREFIX
 #import <SomeFramework/public_header.h> // expected-warning{{treating}}
 #import <SomeFramework/public_header2.h> // expected-warning{{treating}}
+#import <SomeFramework/public_header3.h> // expected-warning{{treating}}
 @import SomeFramework.public_header2;
 #endif

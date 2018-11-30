@@ -62,11 +62,11 @@ void test_unqual_references(X x, const X xc) {
 
 struct Redecl {
   int x; // expected-note{{previous declaration is here}}
-  class y { };
+  class y { }; // expected-note{{previous declaration is here}}
 
   union {
     int x; // expected-error{{member of anonymous union redeclares 'x'}}
-    float y;
+    float y; // expected-error{{member of anonymous union redeclares 'y'}}
     double z; // expected-note{{previous declaration is here}}
     double zz; // expected-note{{previous definition is here}}
   };
@@ -79,6 +79,10 @@ union { // expected-error{{anonymous unions at namespace or global scope must be
   int int_val;
   float float_val;
 };
+
+extern "C++" {
+union { }; // expected-error{{anonymous unions at namespace or global scope must be declared 'static'}}
+}
 
 static union {
   int int_val2; // expected-note{{previous definition is here}}

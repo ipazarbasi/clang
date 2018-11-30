@@ -1,10 +1,16 @@
 // RUN: %clang_cc1 -emit-llvm -triple %itanium_abi_triple -debug-info-kind=limited %s -o - | FileCheck %s
 
-// Run again with -gline-tables-only and verify we don't crash.  We won't output
+// Run again with -gline-tables-only or -gline-directives-only and verify we don't crash.  We won't output
 // type info at all.
 // RUN: %clang_cc1 -emit-llvm -triple %itanium_abi_triple -debug-info-kind=line-tables-only %s -o - | FileCheck %s -check-prefix LINES-ONLY
+// RUN: %clang_cc1 -emit-llvm -triple %itanium_abi_triple -debug-info-kind=line-directives-only %s -o - | FileCheck %s -check-prefix LINES-ONLY
 
 // LINES-ONLY-NOT: !DICompositeType(tag: DW_TAG_structure_type
+
+// "h" is at the top because it's in the compile unit's retainedTypes: list.
+// CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "h<int>"
+// CHECK-NOT: DIFlagFwdDecl
+// CHECK-SAME: ){{$}}
 
 template <typename T>
 struct a {
@@ -17,9 +23,6 @@ struct b {
 };
 extern template class b<int>;
 b<int> bi;
-// CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "b<int>"
-// CHECK-NOT: DIFlagFwdDecl
-// CHECK-SAME: ){{$}}
 
 template <typename T>
 struct c {
@@ -85,9 +88,6 @@ template <typename T>
 struct h {
 };
 template class h<int>;
-// CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "h<int>"
-// CHECK-NOT: DIFlagFwdDecl
-// CHECK-SAME: ){{$}}
 
 template <typename T>
 struct i {
@@ -114,3 +114,7 @@ template <>
 struct k<int>;
 template struct k<int>;
 // CHECK-NOT: !DICompositeType(tag: DW_TAG_structure_type, name: "k<int>"
+
+// CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "b<int>"
+// CHECK-NOT: DIFlagFwdDecl
+// CHECK-SAME: ){{$}}

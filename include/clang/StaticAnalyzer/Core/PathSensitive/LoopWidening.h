@@ -1,4 +1,4 @@
-//===--- LoopWidening.h - Instruction class definition ----------*- C++ -*-===//
+//===--- LoopWidening.h - Widen loops ---------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -22,14 +22,13 @@
 namespace clang {
 namespace ento {
 
-/// \brief Get the states that result from widening the loop.
+/// Get the states that result from widening the loop.
 ///
 /// Widen the loop by invalidating anything that might be modified
 /// by the loop body in any iteration.
 ProgramStateRef getWidenedLoopState(ProgramStateRef PrevState,
                                     const LocationContext *LCtx,
-                                    unsigned BlockCount,
-                                    const Stmt *LoopStmt);
+                                    unsigned BlockCount, const Stmt *LoopStmt);
 
 } // end namespace ento
 } // end namespace clang

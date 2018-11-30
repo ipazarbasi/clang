@@ -11,18 +11,35 @@
 // I386: "hidden"
 // I386: "-o"
 // I386: clang-translation
+
 // RUN: %clang -target i386-apple-darwin9 -### -S %s -o %t.s 2>&1 | \
+// RUN: FileCheck -check-prefix=YONAH %s
+// RUN: %clang -target i386-apple-macosx10.11 -### -S %s -o %t.s 2>&1 | \
 // RUN: FileCheck -check-prefix=YONAH %s
 // YONAH: "-target-cpu"
 // YONAH: "yonah"
+
 // RUN: %clang -target x86_64-apple-darwin9 -### -S %s -o %t.s 2>&1 | \
+// RUN: FileCheck -check-prefix=CORE2 %s
+// RUN: %clang -target x86_64-apple-macosx10.11 -### -S %s -o %t.s 2>&1 | \
 // RUN: FileCheck -check-prefix=CORE2 %s
 // CORE2: "-target-cpu"
 // CORE2: "core2"
+
 // RUN: %clang -target x86_64h-apple-darwin -### -S %s -o %t.s 2>&1 | \
+// RUN: FileCheck -check-prefix=AVX2 %s
+// RUN: %clang -target x86_64h-apple-macosx10.12 -### -S %s -o %t.s 2>&1 | \
 // RUN: FileCheck -check-prefix=AVX2 %s
 // AVX2: "-target-cpu"
 // AVX2: "core-avx2"
+
+// RUN: %clang -target i386-apple-macosx10.12 -### -S %s -o %t.s 2>&1 | \
+// RUN: FileCheck -check-prefix=PENRYN %s
+// RUN: %clang -target x86_64-apple-macosx10.12 -### -S %s -o %t.s 2>&1 | \
+// RUN: FileCheck -check-prefix=PENRYN %s
+// PENRYN: "-target-cpu"
+// PENRYN: "penryn"
+
 
 // RUN: %clang -target x86_64-apple-darwin10 -### -S %s -arch armv7 2>&1 | \
 // RUN: FileCheck -check-prefix=ARMV7_DEFAULT %s
@@ -52,11 +69,51 @@
 // ARMV7_HARDFLOAT-NOT: "-msoft-float"
 // ARMV7_HARDFLOAT: "-x" "c"
 
+// RUN: %clang -target arm64-apple-ios10 -### -S %s -arch arm64 2>&1 | \
+// RUN: FileCheck -check-prefix=ARM64-APPLE %s
+// ARM64-APPLE: -munwind-table
+
+// RUN: %clang -target arm64-apple-ios10 -### -ffreestanding -S %s -arch arm64 2>&1 | \
+// RUN: FileCheck -check-prefix=ARM64-FREESTANDING-APPLE %s
+//
+// RUN: %clang -target arm64-apple-ios10 -### -fno-unwind-tables -ffreestanding -S %s -arch arm64 2>&1 | \
+// RUN: FileCheck -check-prefix=ARM64-FREESTANDING-APPLE %s
+//
+// ARM64-FREESTANDING-APPLE-NOT: -munwind-table
+
+// RUN: %clang -target arm64-apple-ios10 -### -funwind-tables -S %s -arch arm64 2>&1 | \
+// RUN: FileCheck -check-prefix=ARM64-EXPLICIT-UWTABLE-APPLE %s
+//
+// RUN: %clang -target arm64-apple-ios10 -### -ffreestanding -funwind-tables -S %s -arch arm64 2>&1 | \
+// RUN: FileCheck -check-prefix=ARM64-EXPLICIT-UWTABLE-APPLE %s
+//
+// ARM64-EXPLICIT-UWTABLE-APPLE: -munwind-table
+
+// RUN: %clang -target arm64-apple-ios10 -fno-exceptions -### -S %s -arch arm64 2>&1 | \
+// RUN: FileCheck -check-prefix=ARM64-APPLE-EXCEP %s
+// ARM64-APPLE-EXCEP-NOT: -munwind-table
+
+// RUN: %clang -target armv7k-apple-watchos4.0 -### -S %s -arch armv7k 2>&1 | \
+// RUN: FileCheck -check-prefix=ARMV7K-APPLE %s
+// ARMV7K-APPLE: -munwind-table
+
 // RUN: %clang -target arm-linux -### -S %s -march=armv5e 2>&1 | \
 // RUN: FileCheck -check-prefix=ARMV5E %s
 // ARMV5E: clang
 // ARMV5E: "-cc1"
 // ARMV5E: "-target-cpu" "arm1022e"
+
+// RUN: %clang -target arm-linux -mtp=cp15 -### -S %s -arch armv7 2>&1 | \
+// RUN: FileCheck -check-prefix=ARMv7_THREAD_POINTER-HARD %s
+// ARMv7_THREAD_POINTER-HARD: "-target-feature" "+read-tp-hard"
+
+// RUN: %clang -target arm-linux -mtp=soft -### -S %s -arch armv7 2>&1 | \
+// RUN: FileCheck -check-prefix=ARMv7_THREAD_POINTER_SOFT %s
+// ARMv7_THREAD_POINTER_SOFT-NOT: "-target-feature" "+read-tp-hard"
+
+// RUN: %clang -target arm-linux -### -S %s -arch armv7 2>&1 | \
+// RUN: FileCheck -check-prefix=ARMv7_THREAD_POINTER_NON %s
+// ARMv7_THREAD_POINTER_NON-NOT: "-target-feature" "+read-tp-hard"
 
 // RUN: %clang -target powerpc64-unknown-linux-gnu \
 // RUN: -### -S %s -mcpu=G5 2>&1 | FileCheck -check-prefix=PPCG5 %s
@@ -209,7 +266,7 @@
 // AMD64-MINGW: clang
 // AMD64-MINGW: "-cc1"
 // AMD64-MINGW: "-triple"
-// AMD64-MINGW: "amd64--windows-gnu"
+// AMD64-MINGW: "amd64-unknown-windows-gnu"
 // AMD64-MINGW: "-munwind-tables"
 
 // RUN: %clang -target i686-linux-android -### -S %s 2>&1 \
@@ -234,6 +291,13 @@
 // MIPS: "-target-cpu" "mips32r2"
 // MIPS: "-mfloat-abi" "hard"
 
+// RUN: %clang -target mipsisa32r6-linux-gnu -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPSR6 %s
+// MIPSR6: clang
+// MIPSR6: "-cc1"
+// MIPSR6: "-target-cpu" "mips32r6"
+// MIPSR6: "-mfloat-abi" "hard"
+
 // RUN: %clang -target mipsel-linux-gnu -### -S %s 2>&1 | \
 // RUN: FileCheck -check-prefix=MIPSEL %s
 // MIPSEL: clang
@@ -241,12 +305,30 @@
 // MIPSEL: "-target-cpu" "mips32r2"
 // MIPSEL: "-mfloat-abi" "hard"
 
+// RUN: %clang -target mipsisa32r6el-linux-gnu -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPSR6EL %s
+// MIPSR6EL: clang
+// MIPSR6EL: "-cc1"
+// MIPSR6EL: "-target-cpu" "mips32r6"
+// MIPSR6EL: "-mfloat-abi" "hard"
+
 // RUN: %clang -target mipsel-linux-android -### -S %s 2>&1 | \
 // RUN: FileCheck -check-prefix=MIPSEL-ANDROID %s
 // MIPSEL-ANDROID: clang
 // MIPSEL-ANDROID: "-cc1"
-// MIPSEL-ANDROID: "-target-cpu" "mips32r2"
+// MIPSEL-ANDROID: "-target-cpu" "mips32"
+// MIPSEL-ANDROID: "-target-feature" "+fpxx"
+// MIPSEL-ANDROID: "-target-feature" "+nooddspreg"
 // MIPSEL-ANDROID: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mipsel-linux-android -### -S %s -mcpu=mips32r6 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPSEL-ANDROID-R6 %s
+// MIPSEL-ANDROID-R6: clang
+// MIPSEL-ANDROID-R6: "-cc1"
+// MIPSEL-ANDROID-R6: "-target-cpu" "mips32r6"
+// MIPSEL-ANDROID-R6: "-target-feature" "+fp64"
+// MIPSEL-ANDROID-R6: "-target-feature" "+nooddspreg"
+// MIPSEL-ANDROID-R6: "-mfloat-abi" "hard"
 
 // RUN: %clang -target mips64-linux-gnu -### -S %s 2>&1 | \
 // RUN: FileCheck -check-prefix=MIPS64 %s
@@ -255,12 +337,90 @@
 // MIPS64: "-target-cpu" "mips64r2"
 // MIPS64: "-mfloat-abi" "hard"
 
+// RUN: %clang -target mipsisa64r6-linux-gnu -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPS64R6 %s
+// MIPS64R6: clang
+// MIPS64R6: "-cc1"
+// MIPS64R6: "-target-cpu" "mips64r6"
+// MIPS64R6: "-mfloat-abi" "hard"
+
 // RUN: %clang -target mips64el-linux-gnu -### -S %s 2>&1 | \
 // RUN: FileCheck -check-prefix=MIPS64EL %s
 // MIPS64EL: clang
 // MIPS64EL: "-cc1"
 // MIPS64EL: "-target-cpu" "mips64r2"
 // MIPS64EL: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mipsisa64r6el-linux-gnu -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPS64R6EL %s
+// MIPS64R6EL: clang
+// MIPS64R6EL: "-cc1"
+// MIPS64R6EL: "-target-cpu" "mips64r6"
+// MIPS64R6EL: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mips64-linux-gnuabi64 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPS64-GNUABI64 %s
+// MIPS64-GNUABI64: clang
+// MIPS64-GNUABI64: "-cc1"
+// MIPS64-GNUABI64: "-target-cpu" "mips64r2"
+// MIPS64-GNUABI64: "-target-abi" "n64"
+// MIPS64-GNUABI64: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mipsisa64r6-linux-gnuabi64 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPS64R6-GNUABI64 %s
+// MIPS64R6-GNUABI64: clang
+// MIPS64R6-GNUABI64: "-cc1"
+// MIPS64R6-GNUABI64: "-target-cpu" "mips64r6"
+// MIPS64R6-GNUABI64: "-target-abi" "n64"
+// MIPS64R6-GNUABI64: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mips64el-linux-gnuabi64 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPS64EL-GNUABI64 %s
+// MIPS64EL-GNUABI64: clang
+// MIPS64EL-GNUABI64: "-cc1"
+// MIPS64EL-GNUABI64: "-target-cpu" "mips64r2"
+// MIPS64EL-GNUABI64: "-target-abi" "n64"
+// MIPS64EL-GNUABI64: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mipsisa64r6el-linux-gnuabi64 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPS64R6EL-GNUABI64 %s
+// MIPS64R6EL-GNUABI64: clang
+// MIPS64R6EL-GNUABI64: "-cc1"
+// MIPS64R6EL-GNUABI64: "-target-cpu" "mips64r6"
+// MIPS64R6EL-GNUABI64: "-target-abi" "n64"
+// MIPS64R6EL-GNUABI64: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mips64-linux-gnuabin32 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPSN32 %s
+// MIPSN32: clang
+// MIPSN32: "-cc1"
+// MIPSN32: "-target-cpu" "mips64r2"
+// MIPSN32: "-target-abi" "n32"
+// MIPSN32: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mipsisa64r6-linux-gnuabin32 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPSN32R6 %s
+// MIPSN32R6: clang
+// MIPSN32R6: "-cc1"
+// MIPSN32R6: "-target-cpu" "mips64r6"
+// MIPSN32R6: "-target-abi" "n32"
+// MIPSN32R6: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mips64el-linux-gnuabin32 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPSN32EL %s
+// MIPSN32EL: clang
+// MIPSN32EL: "-cc1"
+// MIPSN32EL: "-target-cpu" "mips64r2"
+// MIPSN32EL: "-target-abi" "n32"
+// MIPSN32EL: "-mfloat-abi" "hard"
+
+// RUN: %clang -target mipsisa64r6el-linux-gnuabin32 -### -S %s 2>&1 | \
+// RUN: FileCheck -check-prefix=MIPSN32R6EL %s
+// MIPSN32R6EL: clang
+// MIPSN32R6EL: "-cc1"
+// MIPSN32R6EL: "-target-cpu" "mips64r6"
+// MIPSN32R6EL: "-target-abi" "n32"
+// MIPSN32R6EL: "-mfloat-abi" "hard"
 
 // RUN: %clang -target mips64el-linux-android -### -S %s 2>&1 | \
 // RUN: FileCheck -check-prefix=MIPS64EL-ANDROID %s

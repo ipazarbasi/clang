@@ -37,11 +37,16 @@ void testva (int n, ...)
 // CHECK-PPC-NEXT:  br label %[[CONT:[a-z0-9]+]]
 //
 // CHECK-PPC:[[USING_OVERFLOW]]
+// CHECK-PPC-NEXT:  store i8 8, i8* [[GPRPTR]], align 4
 // CHECK-PPC-NEXT:  [[OVERFLOW_AREA_P:%[0-9]+]] = getelementptr inbounds %struct.__va_list_tag, %struct.__va_list_tag* [[ARRAYDECAY]], i32 0, i32 3
 // CHECK-PPC-NEXT:  [[OVERFLOW_AREA:%.+]] = load i8*, i8** [[OVERFLOW_AREA_P]], align 4
-// CHECK-PPC-NEXT:  [[MEMADDR:%.+]] = bitcast i8* [[OVERFLOW_AREA]] to %struct.x**
-// CHECK-PPC-NEXT:  [[NEW_OVERFLOW_AREA:%[0-9]+]] = getelementptr inbounds i8, i8* [[OVERFLOW_AREA]], i32 4
-// CHECK-PPC-NEXT:  store i8* [[NEW_OVERFLOW_AREA]], i8** [[OVERFLOW_AREA_P]]
+// CHECK-PPC-NEXT:  %{{[0-9]+}} =  ptrtoint i8* %argp.cur to i32
+// CHECK-PPC-NEXT:  %{{[0-9]+}} = add i32 %{{[0-9]+}}, 7
+// CHECK-PPC-NEXT:  %{{[0-9]+}} = and i32 %{{[0-9]+}}, -8
+// CHECK-PPC-NEXT:  %argp.cur.aligned = inttoptr i32 %{{[0-9]+}} to i8*
+// CHECK-PPC-NEXT:  [[MEMADDR:%.+]] = bitcast i8* %argp.cur.aligned to %struct.x**
+// CHECK-PPC-NEXT:  [[NEW_OVERFLOW_AREA:%[0-9]+]] = getelementptr inbounds i8, i8* %argp.cur.aligned, i32 4
+// CHECK-PPC-NEXT:  store i8* [[NEW_OVERFLOW_AREA:%[0-9]+]], i8** [[OVERFLOW_AREA_P]], align 4
 // CHECK-PPC-NEXT:  br label %[[CONT]]
 //
 // CHECK-PPC:[[CONT]]
@@ -49,7 +54,7 @@ void testva (int n, ...)
 // CHECK-PPC-NEXT:  [[AGGR:%[a-z0-9]+]] = load %struct.x*, %struct.x** [[VAARG_ADDR]]
 // CHECK-PPC-NEXT:  [[DEST:%[0-9]+]] = bitcast %struct.x* %t to i8*
 // CHECK-PPC-NEXT:  [[SRC:%.+]] = bitcast %struct.x* [[AGGR]] to i8*
-// CHECK-PPC-NEXT:  call void @llvm.memcpy.p0i8.p0i8.i32(i8* [[DEST]], i8* [[SRC]], i32 16, i32 8, i1 false)
+// CHECK-PPC-NEXT:  call void @llvm.memcpy.p0i8.p0i8.i32(i8* align 8 [[DEST]], i8* align 8 [[SRC]], i32 16, i1 false)
 
   int v = va_arg (ap, int);
   
@@ -72,6 +77,7 @@ void testva (int n, ...)
 // CHECK-PPC-NEXT:  br label %[[CONT:[a-z0-9]+]]
 //
 // CHECK-PPC:[[USING_OVERFLOW]]
+// CHECK-PPC-NEXT:  store i8 8, i8* [[GPRPTR]], align 4
 // CHECK-PPC-NEXT:  [[OVERFLOW_AREA_P:%[0-9]+]] = getelementptr inbounds %struct.__va_list_tag, %struct.__va_list_tag* [[ARRAYDECAY]], i32 0, i32 3
 // CHECK-PPC-NEXT:  [[OVERFLOW_AREA:%.+]] = load i8*, i8** [[OVERFLOW_AREA_P]], align 4
 // CHECK-PPC-NEXT:  [[MEMADDR:%.+]] = bitcast i8* [[OVERFLOW_AREA]] to i32*

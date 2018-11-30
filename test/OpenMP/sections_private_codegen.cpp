@@ -3,8 +3,14 @@
 // RUN: %clang_cc1 -fopenmp -x c++ -triple x86_64-unknown-unknown -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck %s
 // RUN: %clang_cc1 -verify -fopenmp -x c++ -std=c++11 -DLAMBDA -triple %itanium_abi_triple -emit-llvm %s -o - | FileCheck -check-prefix=LAMBDA %s
 // RUN: %clang_cc1 -verify -fopenmp -x c++ -fblocks -DBLOCKS -triple %itanium_abi_triple -emit-llvm %s -o - | FileCheck -check-prefix=BLOCKS %s
+
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -triple x86_64-unknown-unknown -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -std=c++11 -triple x86_64-unknown-unknown -emit-pch -o %t %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -triple x86_64-unknown-unknown -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -std=c++11 -DLAMBDA -triple %itanium_abi_triple -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -fblocks -DBLOCKS -triple %itanium_abi_triple -emit-llvm %s -o - | FileCheck --check-prefix SIMD-ONLY0 %s
+// SIMD-ONLY0-NOT: {{__kmpc|__tgt}}
 // expected-no-diagnostics
-// REQUIRES: x86-registered-target
 #ifndef HEADER
 #define HEADER
 
@@ -41,7 +47,7 @@ T tmain() {
 int main() {
   static int sivar;
 #ifdef LAMBDA
-  // LAMBDA: [[G:@.+]] = global double
+  // LAMBDA: [[G:@.+]] = {{(dso_local )?}}global double
   // LAMBDA-LABEL: @main
   // LAMBDA: call{{.*}} void [[OUTER_LAMBDA:@.+]](
   [&]() {
@@ -86,7 +92,7 @@ int main() {
   }();
   return 0;
 #elif defined(BLOCKS)
-  // BLOCKS: [[G:@.+]] = global double
+  // BLOCKS: [[G:@.+]] = {{(dso_local )?}}global double
   // BLOCKS-LABEL: @main
   // BLOCKS: call {{.*}}void {{%.+}}(i8
   ^{
@@ -157,6 +163,11 @@ int main() {
 // CHECK: ret
 //
 // CHECK: define internal void [[MAIN_MICROTASK]](i{{[0-9]+}}* noalias [[GTID_ADDR:%.+]], i{{[0-9]+}}* noalias %{{.+}})
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
+// CHECK: alloca i{{[0-9]+}},
 // CHECK: [[T_VAR_PRIV:%.+]] = alloca i{{[0-9]+}},
 // CHECK: [[VEC_PRIV:%.+]] = alloca [2 x i{{[0-9]+}}],
 // CHECK: [[S_ARR_PRIV:%.+]] = alloca [2 x [[S_FLOAT_TY]]],
@@ -165,7 +176,6 @@ int main() {
 // CHECK: [[SIVAR_PRIV:%.+]] = alloca i{{[0-9]+}},
 // CHECK-NOT: alloca [[S_FLOAT_TY]],
 // CHECK: store i{{[0-9]+}}* [[GTID_ADDR]], i{{[0-9]+}}** [[GTID_ADDR_REF:%.+]]
-// CHECK: call i32 @__kmpc_single(
 // CHECK-NOT: [[T_VAR_PRIV]]
 // CHECK-NOT: [[VEC_PRIV]]
 // CHECK-NOT: [[SIVAR_PRIV]]
@@ -175,9 +185,13 @@ int main() {
 // CHECK-NOT: [[T_VAR_PRIV]]
 // CHECK-NOT: [[VEC_PRIV]]
 // CHECK: call {{.*}} [[S_FLOAT_TY_DEF_CONSTR]]([[S_FLOAT_TY]]* [[VAR_PRIV]])
+
+// CHECK: call void @__kmpc_for_static_init_4(
+// CHECK: call void @__kmpc_for_static_fini(
+
 // CHECK-DAG: call void [[S_FLOAT_TY_DESTR]]([[S_FLOAT_TY]]* [[VAR_PRIV]])
 // CHECK-DAG: call void [[S_FLOAT_TY_DESTR]]([[S_FLOAT_TY]]*
-// CHECK: call void @__kmpc_end_single(
+// CHECK: call void @__kmpc_barrier(
 // CHECK: ret void
 
 // CHECK: define {{.*}} i{{[0-9]+}} [[TMAIN_INT]]()

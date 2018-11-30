@@ -128,7 +128,7 @@ locations:
         if (Declaration->getQualifiedNameAsString() == "n::m::C") {
           // getFullLoc uses the ASTContext's SourceManager to resolve the source
           // location and break it up into its line and column parts.
-          FullSourceLoc FullLocation = Context->getFullLoc(Declaration->getLocStart());
+          FullSourceLoc FullLocation = Context->getFullLoc(Declaration->getBeginLoc());
           if (FullLocation.isValid())
             llvm::outs() << "Found declaration at "
                          << FullLocation.getSpellingLineNumber() << ":"
@@ -160,7 +160,7 @@ Now we can combine all of the above into a small example program:
 
         bool VisitCXXRecordDecl(CXXRecordDecl *Declaration) {
           if (Declaration->getQualifiedNameAsString() == "n::m::C") {
-            FullSourceLoc FullLocation = Context->getFullLoc(Declaration->getLocStart());
+            FullSourceLoc FullLocation = Context->getFullLoc(Declaration->getBeginLoc());
             if (FullLocation.isValid())
               llvm::outs() << "Found declaration at "
                            << FullLocation.getSpellingLineNumber() << ":"
@@ -205,9 +205,9 @@ following CMakeLists.txt to link it:
 
 ::
 
-    set(LLVM_USED_LIBS clangTooling)
-
     add_clang_executable(find-class-decls FindClassDecls.cpp)
+
+    target_link_libraries(find-class-decls clangTooling)
 
 When running this tool over a small code snippet it will output all
 declarations of a class n::m::C it found:

@@ -1,10 +1,66 @@
 // RUN: %clang_cc1 -verify -fopenmp -ast-print %s | FileCheck %s
 // RUN: %clang_cc1 -fopenmp -x c++ -std=c++11 -emit-pch -o %t %s
 // RUN: %clang_cc1 -fopenmp -std=c++11 -include-pch %t -fsyntax-only -verify %s -ast-print | FileCheck %s
+
+// RUN: %clang_cc1 -verify -fopenmp-simd -ast-print %s | FileCheck %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -std=c++11 -emit-pch -o %t %s
+// RUN: %clang_cc1 -fopenmp-simd -std=c++11 -include-pch %t -fsyntax-only -verify %s -ast-print | FileCheck %s
 // expected-no-diagnostics
 
 #ifndef HEADER
 #define HEADER
+
+struct SS {
+  SS(): a(0) {}
+  SS(int v) : a(v) {}
+  int a;
+  typedef int type;
+};
+
+template <typename T>
+class S7 : public T {
+protected:
+  T *a;
+  T b[2];
+  S7() : a(0) {}
+
+public:
+  S7(typename T::type &v) : a((T*)&v) {
+#pragma omp simd aligned(a)
+    for (int k = 0; k < a->a; ++k)
+      ++this->a->a;
+  }
+  S7 &operator=(S7 &s) {
+#pragma omp simd aligned(this->b : 8)
+    for (int k = 0; k < s.a->a; ++k)
+      ++s.a->a;
+    return *this;
+  }
+};
+
+// CHECK: #pragma omp simd aligned(this->a){{$}}
+// CHECK: #pragma omp simd aligned(this->b: 8)
+// CHECK: #pragma omp simd aligned(this->a)
+
+class S8 : public S7<SS> {
+  S8() {}
+
+public:
+  S8(int v) : S7<SS>(v){
+#pragma omp simd aligned(S7<SS>::a)
+    for (int k = 0; k < a->a; ++k)
+      ++this->a->a;
+  }
+  S8 &operator=(S8 &s) {
+#pragma omp simd aligned(this->b: 4)
+    for (int k = 0; k < s.a->a; ++k)
+      ++s.a->a;
+    return *this;
+  }
+};
+
+// CHECK: #pragma omp simd aligned(this->S7<SS>::a)
+// CHECK: #pragma omp simd aligned(this->b: 4)
 
 void foo() {}
 int g_ind = 1;
@@ -77,7 +133,7 @@ template<int LEN> struct S2 {
 };
 
 // S2<4>::func is called below in main.
-// CHECK: template <int LEN = 4> struct S2 {
+// CHECK: template<> struct S2<4> {
 // CHECK-NEXT: static void func(int n, float *a, float *b, float *c)     {
 // CHECK-NEXT:   int k1 = 0, k2 = 0;
 // CHECK-NEXT: #pragma omp simd safelen(4) linear(k1,k2: 4) aligned(a: 4) simdlen(4)
@@ -97,7 +153,7 @@ int main (int argc, char **argv) {
   static int *a;
 // CHECK: static int *a;
 #pragma omp simd
-// CHECK-NEXT: #pragma omp simd
+// CHECK-NEXT: #pragma omp simd{{$}}
   for (int i=0; i < 2; ++i)*a=2;
 // CHECK-NEXT: for (int i = 0; i < 2; ++i)
 // CHECK-NEXT: *a = 2;

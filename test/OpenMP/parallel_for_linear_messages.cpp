@@ -1,5 +1,7 @@
 // RUN: %clang_cc1 -verify -fopenmp %s
 
+// RUN: %clang_cc1 -verify -fopenmp-simd %s
+
 namespace X {
 int x;
 };
@@ -263,7 +265,7 @@ int main(int argc, char **argv) {
   for (int k = 0; k < argc; ++k)
     ++k;
 
-  foomain<int, char>(argc, argv);
+  foomain<int, char>(argc, argv); // expected-note {{in instantiation of function template specialization 'foomain<int, char>' requested here}}
   return 0;
 }
 

@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -verify -std=c++11 %s
+// RUN: %clang_cc1 -verify -std=c++11 %s -Wno-defaulted-function-deleted
 
 struct NonTrivDtor {
   ~NonTrivDtor();
@@ -90,7 +90,7 @@ class D1 {
 public:
   virtual ~D1() = default; // expected-note {{here}}
 } d1; // ok
-struct D2 : D1 { // expected-note {{virtual destructor requires an unambiguous, accessible 'operator delete'}} \
+struct D2 : D1 { // expected-note 2{{virtual destructor requires an unambiguous, accessible 'operator delete'}} \
                  // expected-error {{deleted function '~D2' cannot override a non-deleted}}
   // implicitly-virtual destructor
 } d2; // expected-error {{deleted function}}

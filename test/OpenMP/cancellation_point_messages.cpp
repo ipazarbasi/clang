@@ -1,11 +1,21 @@
 // RUN: %clang_cc1 -verify -fopenmp -ferror-limit 100 %s
 
+// RUN: %clang_cc1 -verify -fopenmp-simd -ferror-limit 100 %s
+
 int main(int argc, char **argv) {
 #pragma omp cancellation       // expected-error {{expected an OpenMP directive}}
 #pragma omp cancellation point // expected-error {{one of 'for', 'parallel', 'sections' or 'taskgroup' is expected}}
   ;
+#pragma omp parallel
+  {
+#pragma omp cancellation point // expected-error {{one of 'for', 'parallel', 'sections' or 'taskgroup' is expected}}
+  }
 #pragma omp cancellation point parallel untied // expected-error {{unexpected OpenMP clause 'untied' in directive '#pragma omp cancellation point'}}
 #pragma omp cancellation point unknown         // expected-error {{one of 'for', 'parallel', 'sections' or 'taskgroup' is expected}}
+#pragma omp parallel
+  {
+#pragma omp cancellation point unknown         // expected-error {{one of 'for', 'parallel', 'sections' or 'taskgroup' is expected}}
+  }
 #pragma omp cancellation point sections(       // expected-warning {{extra tokens at the end of '#pragma omp cancellation point' are ignored}}
 #pragma omp cancellation point for, )          // expected-warning {{extra tokens at the end of '#pragma omp cancellation point' are ignored}}
 #pragma omp cancellation point taskgroup()     // expected-warning {{extra tokens at the end of '#pragma omp cancellation point' are ignored}}
@@ -53,7 +63,7 @@ int main(int argc, char **argv) {
 #pragma omp cancellation point parallel // expected-error {{'#pragma omp cancellation point' cannot be an immediate substatement}}
     switch (argc)
     case 1:
-#pragma omp cancellation point sections // expected-error {{'#pragma omp cancellation point' cannot be an immediate substatement}}
+#pragma omp cancellation point sections
   switch (argc)
   case 1: {
 #pragma omp cancellation point for
@@ -61,7 +71,7 @@ int main(int argc, char **argv) {
   switch (argc) {
 #pragma omp cancellation point taskgroup
   case 1:
-#pragma omp cancellation point parallel // expected-error {{'#pragma omp cancellation point' cannot be an immediate substatement}}
+#pragma omp cancellation point parallel
     break;
   default: {
 #pragma omp cancellation point sections

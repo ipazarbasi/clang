@@ -9,8 +9,6 @@
 // RUN: %clang_cc1 -fopenmp -emit-llvm -chain-include %s -chain-include %s %s -o - | FileCheck %s -check-prefix=CHECK-TLS-1
 // RUN: %clang_cc1 -fopenmp -emit-llvm -chain-include %s -chain-include %s %s -o - | FileCheck %s -check-prefix=CHECK-TLS-2
 
-// REQUIRES: tls
-
 #if !defined(PASS1)
 #define PASS1
 
@@ -25,7 +23,7 @@ int *a = malloc(20);
 #else
 
 // CHECK: call {{.*}} @__kmpc_threadprivate_register(
-// CHECK-TLS-1: @{{a|\"\\01\?a@@3PE?AHE?A\"}} = {{.*}}thread_local {{.*}}global {{.*}}i32*
+// CHECK-TLS-1: @{{a|\"\?a@@3PE?AHE?A\"}} = {{.*}}thread_local {{.*}}global {{.*}}i32*
 
 // CHECK-LABEL: foo
 // CHECK-TLS-LABEL: foo
@@ -33,9 +31,9 @@ int foo() {
   return *a;
   // CHECK: call {{.*}} @__kmpc_global_thread_num(
   // CHECK: call {{.*}} @__kmpc_threadprivate_cached(
-  // CHECK-TLS-1: call {{.*}} @{{_ZTW1a|\"\\01\?\?__Ea@@YAXXZ\"}}()
+  // CHECK-TLS-1: call {{.*}} @{{_ZTW1a|\"\?\?__Ea@@YAXXZ\"}}()
 }
 
-// CHECK-TLS-2: define {{.*}} @{{_ZTW1a|\"\\01\?\?__Ea@@YAXXZ\"}}()
+// CHECK-TLS-2: define {{.*}} @{{_ZTW1a|\"\?\?__Ea@@YAXXZ\"}}()
 
 #endif

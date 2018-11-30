@@ -11,17 +11,14 @@ set(SOURCES
   CIndexer.cpp
   CXComment.cpp
   CXCursor.cpp
+  CXIndexDataConsumer.cpp
   CXCompilationDatabase.cpp
   CXLoadedDiagnostic.cpp
   CXSourceLocation.cpp
   CXStoredDiagnostic.cpp
   CXString.cpp
   CXType.cpp
-  IndexBody.cpp
-  IndexDecl.cpp
-  IndexTypeSourceInfo.cpp
   Indexing.cpp
-  IndexingContext.cpp
 
   ADDITIONAL_HEADERS
   CIndexDiagnostic.h
@@ -33,7 +30,6 @@ set(SOURCES
   CXTranslationUnit.h
   CXType.h
   Index_Internal.h
-  IndexingContext.h
   ../../include/clang-c/Index.h
   )
 
@@ -62,7 +58,7 @@ option(LIBCLANG_BUILD_STATIC
 set(LLVM_EXPORTED_SYMBOL_FILE ${CMAKE_CURRENT_SOURCE_DIR}/libclang.exports)
 
 if(MSVC)
-  # Avoid LNK4197 not to spceify libclang.def here.
+  # Avoid LNK4197 by not specifying libclang.exports here.
   # Each functions is exported as "dllexport" in include/clang-c.
   # KB835326
   set(LLVM_EXPORTED_SYMBOL_FILE)
@@ -102,18 +98,66 @@ if(ENABLE_SHARED)
       PROPERTIES
       VERSION ${LIBCLANG_LIBRARY_VERSION}
       DEFINE_SYMBOL _CINDEX_LIB_)
-  else()
-    set_target_properties(libclang
-      PROPERTIES
-      VERSION ${LIBCLANG_LIBRARY_VERSION}
-      DEFINE_SYMBOL _CINDEX_LIB_)
-  endif()
-
-  if(APPLE)
+  elseif(APPLE)
     set(LIBCLANG_LINK_FLAGS " -Wl,-compatibility_version -Wl,1")
     set(LIBCLANG_LINK_FLAGS "${LIBCLANG_LINK_FLAGS} -Wl,-current_version -Wl,${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH}")
 
     set_property(TARGET libclang APPEND_STRING PROPERTY
                  LINK_FLAGS ${LIBCLANG_LINK_FLAGS})
+  else()
+    set_target_properties(libclang
+      PROPERTIES
+      VERSION ${LIBCLANG_LIBRARY_VERSION}
+      DEFINE_SYMBOL _CINDEX_LIB_)
+    # FIXME: _CINDEX_LIB_ affects dllexport/dllimport on Win32.
+    if(LLVM_ENABLE_MODULES AND NOT WIN32)
+      target_compile_options(libclang PRIVATE
+        "-fmodules-ignore-macro=_CINDEX_LIB_"
+        )
+    endif()
   endif()
 endif()
+
+if(INTERNAL_INSTALL_PREFIX)
+  set(LIBCLANG_HEADERS_INSTALL_DESTINATION "${INTERNAL_INSTALL_PREFIX}/include")
+else()
+  set(LIBCLANG_HEADERS_INSTALL_DESTINATION include)
+endif()
+
+install(DIRECTORY ../../include/clang-c
+  COMPONENT libclang-headers
+  DESTINATION "${LIBCLANG_HEADERS_INSTALL_DESTINATION}"
+  FILES_MATCHING
+  PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
+  )
+
+# LLVM_DISTRIBUTION_COMPONENTS requires that each component have both a
+# component and an install-component target, so add a dummy libclang-headers
+# target to allow using it in LLVM_DISTRIBUTION_COMPONENTS.
+add_custom_target(libclang-headers)
+set_target_properties(libclang-headers PROPERTIES FOLDER "Misc")
+
+if (NOT CMAKE_CONFIGURATION_TYPES) # don't add this for IDE's.
+  add_llvm_install_targets(install-libclang-headers
+                           COMPONENT libclang-headers)
+endif()
+
+# Create a target to install the python bindings to make them easier to
+# distribute.  Since the bindings are over libclang, which is installed
+# unbundled to the clang version, follow suit.
+foreach(PythonVersion ${CLANG_PYTHON_BINDINGS_VERSIONS})
+  install(DIRECTORY
+            ${CMAKE_CURRENT_SOURCE_DIR}/../../bindings/python/clang
+          COMPONENT
+            libclang-python-bindings
+          DESTINATION
+            "lib${LLVM_LIBDIR_SUFFIX}/python${PythonVersion}/site-packages")
+endforeach()
+if(NOT CMAKE_CONFIGURATION_TYPES)
+  add_custom_target(libclang-python-bindings)
+  add_llvm_install_targets(install-libclang-python-bindings
+                           COMPONENT
+                             libclang-python-bindings)
+endif()
+

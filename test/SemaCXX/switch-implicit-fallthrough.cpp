@@ -179,18 +179,15 @@ void fallthrough_cfgblock_with_null_successor(int x) {
 
 int fallthrough_position(int n) {
   switch (n) {
-      [[clang::fallthrough]];  // expected-warning{{fallthrough annotation does not directly precede switch label}}
       n += 300;
       [[clang::fallthrough]];  // expected-warning{{fallthrough annotation in unreachable code}}
     case 221:
-      [[clang::fallthrough]];  // expected-warning{{fallthrough annotation does not directly precede switch label}}
       return 1;
       [[clang::fallthrough]];  // expected-warning{{fallthrough annotation in unreachable code}}
     case 222:
-      [[clang::fallthrough]];  // expected-warning{{fallthrough annotation does not directly precede switch label}}
       n += 400;
     case 223:          // expected-warning{{unannotated fall-through between switch labels}} expected-note{{insert '[[clang::fallthrough]];' to silence this warning}} expected-note{{insert 'break;' to avoid fall-through}}
-      [[clang::fallthrough]]; // expected-warning{{fallthrough annotation does not directly precede switch label}}
+      ;
   }
 
   long p = static_cast<long>(n) * n;
@@ -282,6 +279,23 @@ namespace PR18983 {
   }
 }
 
+int fallthrough_placement_error(int n) {
+  switch (n) {
+      [[clang::fallthrough]]; // expected-warning{{fallthrough annotation in unreachable code}}
+      n += 300;
+    case 221:
+      [[clang::fallthrough]]; // expected-error{{fallthrough annotation does not directly precede switch label}}
+      return 1;
+    case 222:
+      [[clang::fallthrough]]; // expected-error{{fallthrough annotation does not directly precede switch label}}
+      n += 400;
+      [[clang::fallthrough]];
+    case 223:
+      [[clang::fallthrough]]; // expected-error{{fallthrough annotation does not directly precede switch label}}
+  }
+  return n;
+}
+
 int fallthrough_targets(int n) {
   [[clang::fallthrough]]; // expected-error{{fallthrough annotation is outside switch statement}}
 
@@ -297,6 +311,21 @@ int fallthrough_targets(int n) {
     [[clang::fallthrough]]    // expected-error{{fallthrough attribute is only allowed on empty statements}} expected-note{{did you forget ';'?}}
     case 125:
       n += 1600;
+  }
+  return n;
+}
+
+int fallthrough_alt_spelling(int n) {
+  switch (n) {
+  case 0:
+    n++;
+    [[clang::fallthrough]];
+  case 1:
+    n++;
+    [[clang::__fallthrough__]];
+  case 2:
+    n++;
+    break;
   }
   return n;
 }

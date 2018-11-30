@@ -144,13 +144,13 @@ int test(T t = T{}) {
     };
   }
   { // will need to capture x in outer lambda
-    const int x = 10; //expected-note 2{{declared}}
-    auto L = [z = x](char a) { //expected-note 2{{begins}}
-      auto M = [&y = x](T b) { //expected-error 2{{cannot be implicitly captured}}
+    const int x = 10; //expected-note {{declared}}
+    auto L = [z = x](char a) { //expected-note {{begins}}
+      auto M = [&y = x](T b) { //expected-error {{cannot be implicitly captured}}
         return y;
       };
       return M;
-    };     
+    };
   }
   {
     // no captures
@@ -189,4 +189,28 @@ int run() {
   h<int>();
 }
 
+}
+
+namespace N3922 {
+  struct X { X(); explicit X(const X&); int n; };
+  auto a = [x{X()}] { return x.n; }; // ok
+  auto b = [x = {X()}] {}; // expected-error{{<initializer_list>}}
+}
+
+namespace init_capture_non_mutable {
+void test(double weight) {
+  double init;
+  auto find = [max = init](auto current) {
+    max = current; // expected-error{{cannot assign to a variable captured by copy in a non-mutable lambda}}
+  };
+  find(weight); // expected-note {{in instantiation of function template specialization}}
+}
+}
+
+namespace init_capture_undeclared_identifier {
+  auto a = [x = y]{}; // expected-error{{use of undeclared identifier 'y'}}
+
+  int typo_foo; // expected-note 2 {{'typo_foo' declared here}}
+  auto b = [x = typo_boo]{}; // expected-error{{use of undeclared identifier 'typo_boo'; did you mean 'typo_foo'}}
+  auto c = [x(typo_boo)]{}; // expected-error{{use of undeclared identifier 'typo_boo'; did you mean 'typo_foo'}}
 }

@@ -147,11 +147,13 @@ namespace test8 {
     }
     using ns2::f; // expected-note {{using declaration}}
   }
-  struct A { void f(); }; // expected-note {{target of using declaration}}
+  struct A { void f(); }; // expected-note 2{{target of using declaration}}
   struct B : public A { using A::f; }; // expected-note {{using declaration}}
+  template<typename T> struct C : A { using A::f; }; // expected-note {{using declaration}}
   struct X {
     template<class T> friend void ns1::f(T t); // expected-error {{cannot befriend target of using declaration}}
     friend void B::f(); // expected-error {{cannot befriend target of using declaration}}
+    friend void C<int>::f(); // expected-error {{cannot befriend target of using declaration}}
   };
 }
 
@@ -363,3 +365,49 @@ void g_pr6954() {
   f_pr6954(5); // expected-error{{undeclared identifier 'f_pr6954'}}
 }
 
+namespace tag_redecl {
+  namespace N {
+    struct X *p;
+    namespace {
+      class K {
+        friend struct X;
+      };
+    }
+  }
+  namespace N {
+    struct X;
+    X *q = p;
+  }
+}
+
+namespace default_arg {
+  void f();
+  void f(void*); // expected-note {{previous}}
+  struct X {
+    friend void f(int a, int b = 0) {}
+    friend void f(void *p = 0) {} // expected-error {{must be the only}}
+  };
+}
+
+namespace PR33222 {
+  int f();
+  template<typename T> struct X {
+    friend T f();
+  };
+  X<int> xi;
+
+  int g(); // expected-note {{previous}}
+  template<typename T> struct Y {
+    friend T g(); // expected-error {{return type}}
+  };
+  Y<float> yf; // expected-note {{instantiation}}
+
+  int h();
+  template<typename T> struct Z {
+    // FIXME: The note here should point at the non-friend declaration, not the
+    // instantiation in Z<int>.
+    friend T h(); // expected-error {{return type}} expected-note {{previous}}
+  };
+  Z<int> zi;
+  Z<float> zf; // expected-note {{instantiation}}
+}

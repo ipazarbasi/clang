@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -w -triple x86_64-elf-gnu -emit-llvm -o - %s -std=c++11 | FileCheck %s
+// RUN: %clang_cc1 -w -fmerge-all-constants -triple x86_64-elf-gnu -emit-llvm -o - %s -std=c++11 | FileCheck %s
 
 // FIXME: The padding in all these objects should be zero-initialized.
 namespace StructUnion {
@@ -343,13 +343,13 @@ namespace VirtualMembers {
     constexpr E() : B(3), c{'b','y','e'} {}
     char c[3];
   };
-  // CHECK: @_ZN14VirtualMembers1eE = global { i8**, double, i32, i8**, double, [5 x i8], i16, i8**, double, [5 x i8], [3 x i8] } { i8** getelementptr inbounds ([11 x i8*], [11 x i8*]* @_ZTVN14VirtualMembers1EE, i64 0, i64 2), double 1.000000e+00, i32 64, i8** getelementptr inbounds ([11 x i8*], [11 x i8*]* @_ZTVN14VirtualMembers1EE, i64 0, i64 5), double 2.000000e+00, [5 x i8] c"hello", i16 5, i8** getelementptr inbounds ([11 x i8*], [11 x i8*]* @_ZTVN14VirtualMembers1EE, i64 0, i64 9), double 3.000000e+00, [5 x i8] c"world", [3 x i8] c"bye" }
+  // CHECK: @_ZN14VirtualMembers1eE = global { i8**, double, i32, i8**, double, [5 x i8], i16, i8**, double, [5 x i8], [3 x i8] } { i8** getelementptr inbounds ({ [3 x i8*], [4 x i8*], [4 x i8*] }, { [3 x i8*], [4 x i8*], [4 x i8*] }* @_ZTVN14VirtualMembers1EE, i32 0, inrange i32 0, i32 2), double 1.000000e+00, i32 64, i8** getelementptr inbounds ({ [3 x i8*], [4 x i8*], [4 x i8*] }, { [3 x i8*], [4 x i8*], [4 x i8*] }* @_ZTVN14VirtualMembers1EE, i32 0, inrange i32 1, i32 2), double 2.000000e+00, [5 x i8] c"hello", i16 5, i8** getelementptr inbounds ({ [3 x i8*], [4 x i8*], [4 x i8*] }, { [3 x i8*], [4 x i8*], [4 x i8*] }* @_ZTVN14VirtualMembers1EE, i32 0, inrange i32 2, i32 2), double 3.000000e+00, [5 x i8] c"world", [3 x i8] c"bye" }
   E e;
 
   struct nsMemoryImpl {
     virtual void f();
   };
-  // CHECK: @_ZN14VirtualMembersL13sGlobalMemoryE = internal global { i8** } { i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @_ZTVN14VirtualMembers12nsMemoryImplE, i64 0, i64 2) }
+  // CHECK: @_ZN14VirtualMembersL13sGlobalMemoryE = internal global { i8** } { i8** getelementptr inbounds ({ [3 x i8*] }, { [3 x i8*] }* @_ZTVN14VirtualMembers12nsMemoryImplE, i32 0, inrange i32 0, i32 2) }
   __attribute__((used))
   static nsMemoryImpl sGlobalMemory;
 
@@ -360,7 +360,7 @@ namespace VirtualMembers {
 
     T t;
   };
-  // CHECK: @_ZN14VirtualMembers1tE = global { i8**, i32 } { i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @_ZTVN14VirtualMembers13TemplateClassIiEE, i64 0, i64 2), i32 42 }
+  // CHECK: @_ZN14VirtualMembers1tE = global { i8**, i32 } { i8** getelementptr inbounds ({ [3 x i8*] }, { [3 x i8*] }* @_ZTVN14VirtualMembers13TemplateClassIiEE, i32 0, inrange i32 0, i32 2), i32 42 }
   TemplateClass<int> t;
 }
 
@@ -402,7 +402,7 @@ namespace UnemittedTemporaryDecl {
 
 // CHECK: @_ZZN12LocalVarInit3aggEvE1a = internal constant {{.*}} i32 101
 // CHECK: @_ZZN12LocalVarInit4ctorEvE1a = internal constant {{.*}} i32 102
-// CHECK: @_ZZN12LocalVarInit8mutable_EvE1a = private unnamed_addr constant {{.*}} i32 103
+// CHECK: @__const._ZN12LocalVarInit8mutable_Ev.a = private unnamed_addr constant {{.*}} i32 103
 // CHECK: @_ZGRN33ClassTemplateWithStaticDataMember1SIvE1aE_ = linkonce_odr constant i32 5, comdat
 // CHECK: @_ZN33ClassTemplateWithStaticDataMember3useE = constant i32* @_ZGRN33ClassTemplateWithStaticDataMember1SIvE1aE_
 // CHECK: @_ZGRN39ClassTemplateWithHiddenStaticDataMember1SIvE1aE_ = linkonce_odr hidden constant i32 5, comdat
@@ -461,7 +461,7 @@ namespace LocalVarInit {
 
   // CHECK: define {{.*}} @_ZN12LocalVarInit8mutable_Ev
   // CHECK-NOT: call
-  // CHECK: call {{.*}}memcpy{{.*}} @_ZZN12LocalVarInit8mutable_EvE1a
+  // CHECK: call {{.*}}memcpy{{.*}} @__const._ZN12LocalVarInit8mutable_Ev.a
   // CHECK-NOT: call
   // Can't fold return value due to 'mutable'.
   // CHECK-NOT: ret i32 103

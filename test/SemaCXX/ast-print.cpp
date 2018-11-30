@@ -214,10 +214,13 @@ namespace {
 struct [[gnu::visibility("hidden")]] S;
 }
 
-// CHECK: struct CXXFunctionalCastExprPrint fce = CXXFunctionalCastExprPrint{};
+// CHECK:      struct CXXFunctionalCastExprPrint {
+// CHECK-NEXT: } fce = CXXFunctionalCastExprPrint{};
 struct CXXFunctionalCastExprPrint {} fce = CXXFunctionalCastExprPrint{};
 
-// CHECK: struct CXXTemporaryObjectExprPrint toe = CXXTemporaryObjectExprPrint{};
+// CHECK:      struct CXXTemporaryObjectExprPrint {
+// CHECK-NEXT:   CXXTemporaryObjectExprPrint();
+// CHECK-NEXT: } toe = CXXTemporaryObjectExprPrint{};
 struct CXXTemporaryObjectExprPrint { CXXTemporaryObjectExprPrint(); } toe = CXXTemporaryObjectExprPrint{};
 
 namespace PR24872 {
@@ -226,4 +229,15 @@ namespace PR24872 {
 template <typename T> struct Foo : T {
   using T::operator-;
 };
+}
+
+namespace dont_crash_on_auto_vars {
+struct T { enum E {X = 12ll }; };
+struct S {
+  struct  { int I; } ADecl;
+  static const auto Y = T::X;
+};
+//CHECK: static const auto Y = T::X;
+constexpr auto var = T::X;
+//CHECK: constexpr auto var = T::X;
 }

@@ -63,7 +63,8 @@ typedef unsigned Unsigned;
 typedef signed Signed;
 
 struct Test5 { unsigned n : 2; } t5;
-typedef __typeof__(t5.n) Unsigned; // Bitfield is unsigned
+// Bitfield is unsigned
+struct Test5 sometest5 = {-1};
 typedef __typeof__(+t5.n) Signed;  // ... but promotes to signed.
 
 typedef __typeof__(t5.n + 0) Signed; // Arithmetic promotes.
@@ -80,4 +81,8 @@ typedef __typeof__(+(t5.n--)) Unsigned; // also act like compound-assignment.
 
 struct Test6 {
   : 0.0; // expected-error{{type name requires a specifier or qualifier}}
+};
+
+struct PR36157 {
+  int n : 1 ? 1 : implicitly_declare_function(); // expected-warning {{invalid in C99}}
 };

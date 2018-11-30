@@ -2,10 +2,16 @@
 // RUN: %clang_cc1 -fopenmp -x c++ -std=c++11 -triple x86_64-unknown-unknown -fexceptions -fcxx-exceptions -emit-pch -o %t %s
 // RUN: %clang_cc1 -fopenmp -x c++ -triple x86_64-unknown-unknown -fexceptions -fcxx-exceptions -debug-info-kind=limited -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck %s
 // RUN: %clang_cc1 -verify -triple x86_64-apple-darwin10 -fopenmp -fexceptions -fcxx-exceptions -debug-info-kind=line-tables-only -x c++ -emit-llvm %s -o - | FileCheck %s --check-prefix=TERM_DEBUG
-// REQUIRES: x86-registered-target
+
+// RUN: %clang_cc1 -verify -fopenmp-simd -x c++ -triple x86_64-unknown-unknown -emit-llvm %s -fexceptions -fcxx-exceptions -o - | FileCheck %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -std=c++11 -triple x86_64-unknown-unknown -fexceptions -fcxx-exceptions -emit-pch -o %t %s
+// RUN: %clang_cc1 -fopenmp-simd -x c++ -triple x86_64-unknown-unknown -fexceptions -fcxx-exceptions -debug-info-kind=limited -std=c++11 -include-pch %t -verify %s -emit-llvm -o - | FileCheck %s
+// RUN: %clang_cc1 -verify -triple x86_64-apple-darwin10 -fopenmp-simd -fexceptions -fcxx-exceptions -debug-info-kind=line-tables-only -x c++ -emit-llvm %s -o - | FileCheck --check-prefix=TERM_DEBUG %s
 // expected-no-diagnostics
-#ifndef HEADER
-#define HEADER
+ #ifndef HEADER
+ #define HEADER
+
+// CHECK: [[SS_TY:%.+]] = type { i32 }
 
 long long get_val() { return 0; }
 double *g_ptr;
@@ -19,7 +25,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[CMP:%.+]] = icmp slt i32 [[IV]], 6
 // CHECK-NEXT: br i1 [[CMP]], label %[[SIMPLE_LOOP1_BODY:.+]], label %[[SIMPLE_LOOP1_END:[^,]+]]
   for (int i = 3; i < 32; i += 5) {
-// CHECK: [[SIMPLE_LOOP1_BODY]]
+// CHECK: [[SIMPLE_LOOP1_BODY]]:
 // Start of body: calculate i from IV:
 // CHECK: [[IV1_1:%.+]] = load i32, i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP1_ID]]
 // CHECK: [[CALC_I_1:%.+]] = mul nsw i32 [[IV1_1]], 5
@@ -34,7 +40,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: store i32 [[ADD1_2]], i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP1_ID]]
 // br label %{{.+}}, !llvm.loop !{{.+}}
   }
-// CHECK: [[SIMPLE_LOOP1_END]]
+// CHECK: [[SIMPLE_LOOP1_END]]:
 
   long long k = get_val();
 
@@ -49,7 +55,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[CMP2:%.+]] = icmp slt i32 [[IV2]], 9
 // CHECK-NEXT: br i1 [[CMP2]], label %[[SIMPLE_LOOP2_BODY:.+]], label %[[SIMPLE_LOOP2_END:[^,]+]]
   for (int i = 10; i > 1; i--) {
-// CHECK: [[SIMPLE_LOOP2_BODY]]
+// CHECK: [[SIMPLE_LOOP2_BODY]]:
 // Start of body: calculate i from IV:
 // CHECK: [[IV2_0:%.+]] = load i32, i32* [[OMP_IV2]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP2_ID]]
 // FIXME: It is interesting, why the following "mul 1" was not constant folded?
@@ -71,7 +77,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: store i32 [[ADD2_2]], i32* [[OMP_IV2]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP2_ID]]
 // br label {{.+}}, !llvm.loop ![[SIMPLE_LOOP2_ID]]
   }
-// CHECK: [[SIMPLE_LOOP2_END]]
+// CHECK: [[SIMPLE_LOOP2_END]]:
 //
 // Update linear vars after loop, as the loop was operating on a private version.
 // CHECK: [[LIN0_2:%.+]] = load i64, i64* [[LIN0]]
@@ -99,7 +105,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[CMP3:%.+]] = icmp ult i64 [[IV3]], 4
 // CHECK-NEXT: br i1 [[CMP3]], label %[[SIMPLE_LOOP3_BODY:.+]], label %[[SIMPLE_LOOP3_END:[^,]+]]
   for (unsigned long long it = 2000; it >= 600; it-=400) {
-// CHECK: [[SIMPLE_LOOP3_BODY]]
+// CHECK: [[SIMPLE_LOOP3_BODY]]:
 // Start of body: calculate it from IV:
 // CHECK: [[IV3_0:%.+]] = load i64, i64* [[OMP_IV3]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP3_ID]]
 // CHECK-NEXT: [[LC_IT_1:%.+]] = mul i64 [[IV3_0]], 400
@@ -125,7 +131,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[ADD3_2:%.+]] = add i64 [[IV3_2]], 1
 // CHECK-NEXT: store i64 [[ADD3_2]], i64* [[OMP_IV3]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP3_ID]]
   }
-// CHECK: [[SIMPLE_LOOP3_END]]
+// CHECK: [[SIMPLE_LOOP3_END]]:
 //
 // Linear start and step are used to calculate final value of the linear variables.
 // CHECK: [[LINSTART:.+]] = load i32, i32* [[LIN_START]]
@@ -141,7 +147,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[CMP4:%.+]] = icmp slt i32 [[IV4]], 4
 // CHECK-NEXT: br i1 [[CMP4]], label %[[SIMPLE_LOOP4_BODY:.+]], label %[[SIMPLE_LOOP4_END:[^,]+]]
   for (short it = 6; it <= 20; it-=-4) {
-// CHECK: [[SIMPLE_LOOP4_BODY]]
+// CHECK: [[SIMPLE_LOOP4_BODY]]:
 // Start of body: calculate it from IV:
 // CHECK: [[IV4_0:%.+]] = load i32, i32* [[OMP_IV4]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP4_ID]]
 // CHECK-NEXT: [[LC_IT_1:%.+]] = mul nsw i32 [[IV4_0]], 4
@@ -153,7 +159,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[ADD4_2:%.+]] = add nsw i32 [[IV4_2]], 1
 // CHECK-NEXT: store i32 [[ADD4_2]], i32* [[OMP_IV4]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP4_ID]]
   }
-// CHECK: [[SIMPLE_LOOP4_END]]
+// CHECK: [[SIMPLE_LOOP4_END]]:
 
   #pragma omp simd
 // CHECK: store i32 0, i32* [[OMP_IV5:%[^,]+]]
@@ -162,7 +168,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[CMP5:%.+]] = icmp slt i32 [[IV5]], 26
 // CHECK-NEXT: br i1 [[CMP5]], label %[[SIMPLE_LOOP5_BODY:.+]], label %[[SIMPLE_LOOP5_END:[^,]+]]
   for (unsigned char it = 'z'; it >= 'a'; it+=-1) {
-// CHECK: [[SIMPLE_LOOP5_BODY]]
+// CHECK: [[SIMPLE_LOOP5_BODY]]:
 // Start of body: calculate it from IV:
 // CHECK: [[IV5_0:%.+]] = load i32, i32* [[OMP_IV5]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP5_ID]]
 // CHECK-NEXT: [[IV5_1:%.+]] = mul nsw i32 [[IV5_0]], 1
@@ -174,7 +180,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[ADD5_2:%.+]] = add nsw i32 [[IV5_2]], 1
 // CHECK-NEXT: store i32 [[ADD5_2]], i32* [[OMP_IV5]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP5_ID]]
   }
-// CHECK: [[SIMPLE_LOOP5_END]]
+// CHECK: [[SIMPLE_LOOP5_END]]:
 
 // CHECK-NOT: mul i32 %{{.+}}, 10
   #pragma omp simd
@@ -187,12 +193,12 @@ void simple(float *a, float *b, float *c, float *d) {
   #pragma omp simd lastprivate(A)
 // CHECK: store i64 0, i64* [[OMP_IV7:%[^,]+]]
 // CHECK: br label %[[SIMD_LOOP7_COND:[^,]+]]
-// CHECK: [[SIMD_LOOP7_COND]]
+// CHECK: [[SIMD_LOOP7_COND]]:
 // CHECK-NEXT: [[IV7:%.+]] = load i64, i64* [[OMP_IV7]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP7_ID:[0-9]+]]
 // CHECK-NEXT: [[CMP7:%.+]] = icmp slt i64 [[IV7]], 7
 // CHECK-NEXT: br i1 [[CMP7]], label %[[SIMPLE_LOOP7_BODY:.+]], label %[[SIMPLE_LOOP7_END:[^,]+]]
   for (long long i = -10; i < 10; i += 3) {
-// CHECK: [[SIMPLE_LOOP7_BODY]]
+// CHECK: [[SIMPLE_LOOP7_BODY]]:
 // Start of body: calculate i from IV:
 // CHECK: [[IV7_0:%.+]] = load i64, i64* [[OMP_IV7]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP7_ID]]
 // CHECK-NEXT: [[LC_IT_1:%.+]] = mul nsw i64 [[IV7_0]], 3
@@ -206,7 +212,8 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[ADD7_2:%.+]] = add nsw i64 [[IV7_2]], 1
 // CHECK-NEXT: store i64 [[ADD7_2]], i64* [[OMP_IV7]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP7_ID]]
   }
-// CHECK: [[SIMPLE_LOOP7_END]]
+// CHECK: [[SIMPLE_LOOP7_END]]:
+// CHECK-NEXT: store i64 11, i64*
 // CHECK-NEXT: [[A_PRIV_VAL:%.+]] = load i32, i32* [[A_PRIV]],
 // CHECK-NEXT: store i32 [[A_PRIV_VAL]], i32* [[A]],
   int R;
@@ -216,12 +223,12 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK: store i32 1, i32* [[R_PRIV:%[^,]+]],
   #pragma omp simd reduction(*:R)
 // CHECK: br label %[[SIMD_LOOP8_COND:[^,]+]]
-// CHECK: [[SIMD_LOOP8_COND]]
+// CHECK: [[SIMD_LOOP8_COND]]:
 // CHECK-NEXT: [[IV8:%.+]] = load i64, i64* [[OMP_IV8]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP8_ID:[0-9]+]]
 // CHECK-NEXT: [[CMP8:%.+]] = icmp slt i64 [[IV8]], 7
 // CHECK-NEXT: br i1 [[CMP8]], label %[[SIMPLE_LOOP8_BODY:.+]], label %[[SIMPLE_LOOP8_END:[^,]+]]
   for (long long i = -10; i < 10; i += 3) {
-// CHECK: [[SIMPLE_LOOP8_BODY]]
+// CHECK: [[SIMPLE_LOOP8_BODY]]:
 // Start of body: calculate i from IV:
 // CHECK: [[IV8_0:%.+]] = load i64, i64* [[OMP_IV8]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP8_ID]]
 // CHECK-NEXT: [[LC_IT_1:%.+]] = mul nsw i64 [[IV8_0]], 3
@@ -234,7 +241,7 @@ void simple(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[ADD8_2:%.+]] = add nsw i64 [[IV8_2]], 1
 // CHECK-NEXT: store i64 [[ADD8_2]], i64* [[OMP_IV8]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP8_ID]]
   }
-// CHECK: [[SIMPLE_LOOP8_END]]
+// CHECK: [[SIMPLE_LOOP8_END]]:
 // CHECK-DAG: [[R_VAL:%.+]] = load i32, i32* [[R]],
 // CHECK-DAG: [[R_PRIV_VAL:%.+]] = load i32, i32* [[R_PRIV]],
 // CHECK: [[RED:%.+]] = mul nsw i32 [[R_VAL]], [[R_PRIV_VAL]]
@@ -262,7 +269,7 @@ int templ1(T a, T *z) {
 // CHECK: [[IV:%.+]] = load i64, i64* [[T1_OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[T1_ID:[0-9]+]]
 // CHECK-NEXT: [[CMP1:%.+]] = icmp slt i64 [[IV]], 16
 // CHECK-NEXT: br i1 [[CMP1]], label %[[T1_BODY:.+]], label %[[T1_END:[^,]+]]
-// CHECK: [[T1_BODY]]
+// CHECK: [[T1_BODY]]:
 // Loop counters i and j updates:
 // CHECK: [[IV1:%.+]] = load i64, i64* [[T1_OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[T1_ID]]
 // CHECK-NEXT: [[I_1:%.+]] = sdiv i64 [[IV1]], 4
@@ -280,7 +287,7 @@ int templ1(T a, T *z) {
 // CHECK-NEXT: [[INC:%.+]] = add nsw i64 [[IV3]], 1
 // CHECK-NEXT: store i64 [[INC]], i64* [[T1_OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[T1_ID]]
 // CHECK-NEXT: br label {{%.+}}
-// CHECK: [[T1_END]]
+// CHECK: [[T1_END]]:
 // CHECK: ret i32 0
 //
 void inst_templ1() {
@@ -321,7 +328,6 @@ public:
 // CHECK-LABEL: define {{.*void}} @{{.*}}iter_simple{{.*}}
 void iter_simple(IterDouble ia, IterDouble ib, IterDouble ic) {
 //
-// CHECK: store i32 0, i32* [[IT_OMP_IV:%[^,]+]]
 // Calculate number of iterations before the loop body.
 // CHECK: [[DIFF1:%.+]] = invoke {{.*}}i32 @{{.*}}IterDouble{{.*}}
 // CHECK: [[DIFF2:%.+]] = sub nsw i32 [[DIFF1]], 1
@@ -329,6 +335,7 @@ void iter_simple(IterDouble ia, IterDouble ib, IterDouble ic) {
 // CHECK-NEXT: [[DIFF4:%.+]] = sdiv i32 [[DIFF3]], 1
 // CHECK-NEXT: [[DIFF5:%.+]] = sub nsw i32 [[DIFF4]], 1
 // CHECK-NEXT: store i32 [[DIFF5]], i32* [[OMP_LAST_IT:%[^,]+]]{{.+}}
+// CHECK: store i32 0, i32* [[IT_OMP_IV:%[^,]+]]
   #pragma omp simd
 
 // CHECK: [[IV:%.+]] = load i32, i32* [[IT_OMP_IV]]{{.+}} !llvm.mem.parallel_loop_access ![[ITER_LOOP_ID:[0-9]+]]
@@ -337,7 +344,7 @@ void iter_simple(IterDouble ia, IterDouble ib, IterDouble ic) {
 // CHECK-NEXT: [[CMP:%.+]] = icmp slt i32 [[IV]], [[NUM_IT]]
 // CHECK-NEXT: br i1 [[CMP]], label %[[IT_BODY:[^,]+]], label %[[IT_END:[^,]+]]
   for (IterDouble i = ia; i < ib; ++i) {
-// CHECK: [[IT_BODY]]
+// CHECK: [[IT_BODY]]:
 // Start of body: calculate i from index:
 // CHECK: [[IV1:%.+]] = load i32, i32* [[IT_OMP_IV]]{{.+}}!llvm.mem.parallel_loop_access ![[ITER_LOOP_ID]]
 // Call of operator+ (i, IV).
@@ -355,7 +362,7 @@ void iter_simple(IterDouble ia, IterDouble ib, IterDouble ic) {
 // CHECK-NEXT: store i32 [[ADD2]], i32* [[IT_OMP_IV]]{{.+}}!llvm.mem.parallel_loop_access ![[ITER_LOOP_ID]]
 // br label %{{.*}}, !llvm.loop ![[ITER_LOOP_ID]]
   }
-// CHECK: [[IT_END]]
+// CHECK: [[IT_END]]:
 // CHECK: ret void
 }
 
@@ -378,7 +385,7 @@ void collapsed(float *a, float *b, float *c, float *d) {
       for (int k = 3; k <= 6; k++) // 4 iterations
         for (l = 4; l < 9; ++l) // 5 iterations
         {
-// CHECK: [[COLL1_BODY]]
+// CHECK: [[COLL1_BODY]]:
 // Start of body: calculate i from index:
 // CHECK: [[IV1:%.+]] = load i32, i32* [[OMP_IV]]{{.+}}!llvm.mem.parallel_loop_access ![[COLL1_LOOP_ID]]
 // Calculation of the loop counters values.
@@ -413,12 +420,13 @@ void collapsed(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: [[ADD2:%.+]] = add i32 [[IV2]], 1
 // CHECK-NEXT: store i32 [[ADD2]], i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[COLL1_LOOP_ID]]
 // br label %{{[^,]+}}, !llvm.loop ![[COLL1_LOOP_ID]]
-// CHECK: [[COLL1_END]]
+// CHECK: [[COLL1_END]]:
   }
 // i,j,l are updated; k is not updated.
-// CHECK: store i32 3, i32* [[I:%[^,]+]]
-// CHECK-NEXT: store i32 5, i32* [[I:%[^,]+]]
-// CHECK-NEXT: store i16 9, i16* [[I:%[^,]+]]
+// CHECK: store i32 3, i32*
+// CHECK-NEXT: store i32 5, i32*
+// CHECK-NEXT: store i32 7, i32*
+// CHECK-NEXT: store i16 9, i16*
 // CHECK: ret void
 }
 
@@ -445,7 +453,7 @@ void widened(float *a, float *b, float *c, float *d) {
   for (i = 1; i < 3; i++) // 2 iterations
     for (j = 0; j < foo(); j++) // foo() iterations
   {
-// CHECK: [[WIDE1_BODY]]
+// CHECK: [[WIDE1_BODY]]:
 // Start of body: calculate i from index:
 // CHECK: [[IV1:%.+]] = load i64, i64* [[OMP_IV]]{{.+}}!llvm.mem.parallel_loop_access ![[WIDE1_LOOP_ID]]
 // Calculation of the loop counters values...
@@ -469,7 +477,7 @@ void widened(float *a, float *b, float *c, float *d) {
 // CHECK-NEXT: store i64 [[ADD2]], i64* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[WIDE1_LOOP_ID]]
 //
 // br label %{{[^,]+}}, !llvm.loop ![[WIDE1_LOOP_ID]]
-// CHECK: [[WIDE1_END]]
+// CHECK: [[WIDE1_END]]:
   }
 // i,j are updated.
 // CHECK: store i32 3, i32* [[I:%[^,]+]]
@@ -490,8 +498,10 @@ void linear(float *a) {
 
   #pragma omp simd linear(k : 3)
 // CHECK: store i64* [[VAL_ADDR]], i64** [[K_ADDR]],
+// CHECK: [[VAL_REF:%.+]] = load i64*, i64** [[K_ADDR]],
+// CHECK: store i64* [[VAL_REF]], i64** [[K_ADDR_REF:%.+]],
 // CHECK: store i32 0, i32* [[OMP_IV:%[^,]+]]
-// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR]],
+// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR_REF]],
 // CHECK: [[K0LOAD:%.+]] = load i64, i64* [[K_REF]]
 // CHECK-NEXT: store i64 [[K0LOAD]], i64* [[LIN0:%[^,]+]]
 
@@ -499,7 +509,7 @@ void linear(float *a) {
 // CHECK-NEXT: [[CMP2:%.+]] = icmp slt i32 [[IV]], 9
 // CHECK-NEXT: br i1 [[CMP2]], label %[[SIMPLE_LOOP_BODY:.+]], label %[[SIMPLE_LOOP_END:[^,]+]]
   for (int i = 10; i > 1; i--) {
-// CHECK: [[SIMPLE_LOOP_BODY]]
+// CHECK: [[SIMPLE_LOOP_BODY]]:
 // Start of body: calculate i from IV:
 // CHECK: [[IV_0:%.+]] = load i32, i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP_ID]]
 // FIXME: It is interesting, why the following "mul 1" was not constant folded?
@@ -521,10 +531,10 @@ void linear(float *a) {
 // CHECK-NEXT: store i32 [[ADD2_2]], i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP_ID]]
 // br label {{.+}}, !llvm.loop ![[SIMPLE_LOOP_ID]]
   }
-// CHECK: [[SIMPLE_LOOP_END]]
+// CHECK: [[SIMPLE_LOOP_END]]:
 //
 // Update linear vars after loop, as the loop was operating on a private version.
-// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR]],
+// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR_REF]],
 // CHECK: store i64* [[K_REF]], i64** [[K_PRIV_REF:%.+]],
 // CHECK: [[LIN0_2:%.+]] = load i64, i64* [[LIN0]]
 // CHECK-NEXT: [[LIN_ADD2:%.+]] = add nsw i64 [[LIN0_2]], 27
@@ -533,8 +543,10 @@ void linear(float *a) {
 //
 
   #pragma omp simd linear(val(k) : 3)
+// CHECK: [[VAL_REF:%.+]] = load i64*, i64** [[K_ADDR]],
+// CHECK: store i64* [[VAL_REF]], i64** [[K_ADDR_REF:%.+]],
 // CHECK: store i32 0, i32* [[OMP_IV:%[^,]+]]
-// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR]],
+// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR_REF]],
 // CHECK: [[K0LOAD:%.+]] = load i64, i64* [[K_REF]]
 // CHECK-NEXT: store i64 [[K0LOAD]], i64* [[LIN0:%[^,]+]]
 
@@ -542,7 +554,7 @@ void linear(float *a) {
 // CHECK-NEXT: [[CMP2:%.+]] = icmp slt i32 [[IV]], 9
 // CHECK-NEXT: br i1 [[CMP2]], label %[[SIMPLE_LOOP_BODY:.+]], label %[[SIMPLE_LOOP_END:[^,]+]]
   for (int i = 10; i > 1; i--) {
-// CHECK: [[SIMPLE_LOOP_BODY]]
+// CHECK: [[SIMPLE_LOOP_BODY]]:
 // Start of body: calculate i from IV:
 // CHECK: [[IV_0:%.+]] = load i32, i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP_ID]]
 // FIXME: It is interesting, why the following "mul 1" was not constant folded?
@@ -564,10 +576,10 @@ void linear(float *a) {
 // CHECK-NEXT: store i32 [[ADD2_2]], i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP_ID]]
 // br label {{.+}}, !llvm.loop ![[SIMPLE_LOOP_ID]]
   }
-// CHECK: [[SIMPLE_LOOP_END]]
+// CHECK: [[SIMPLE_LOOP_END]]:
 //
 // Update linear vars after loop, as the loop was operating on a private version.
-// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR]],
+// CHECK: [[K_REF:%.+]] = load i64*, i64** [[K_ADDR_REF]],
 // CHECK: store i64* [[K_REF]], i64** [[K_PRIV_REF:%.+]],
 // CHECK: [[LIN0_2:%.+]] = load i64, i64* [[LIN0]]
 // CHECK-NEXT: [[LIN_ADD2:%.+]] = add nsw i64 [[LIN0_2]], 27
@@ -583,7 +595,7 @@ void linear(float *a) {
 // CHECK-NEXT: [[CMP2:%.+]] = icmp slt i32 [[IV]], 9
 // CHECK-NEXT: br i1 [[CMP2]], label %[[SIMPLE_LOOP_BODY:.+]], label %[[SIMPLE_LOOP_END:[^,]+]]
   for (int i = 10; i > 1; i--) {
-// CHECK: [[SIMPLE_LOOP_BODY]]
+// CHECK: [[SIMPLE_LOOP_BODY]]:
 // Start of body: calculate i from IV:
 // CHECK: [[IV_0:%.+]] = load i32, i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP_ID]]
 // FIXME: It is interesting, why the following "mul 1" was not constant folded?
@@ -605,7 +617,7 @@ void linear(float *a) {
 // CHECK-NEXT: store i32 [[ADD2_2]], i32* [[OMP_IV]]{{.*}}!llvm.mem.parallel_loop_access ![[SIMPLE_LOOP_ID]]
 // br label {{.+}}, !llvm.loop ![[SIMPLE_LOOP_ID]]
   }
-// CHECK: [[SIMPLE_LOOP_END]]
+// CHECK: [[SIMPLE_LOOP_END]]:
 //
 // Update linear vars after loop, as the loop was operating on a private version.
 // CHECK: [[LIN0_2:%.+]] = load i64, i64* [[LIN0]]
@@ -632,5 +644,72 @@ void parallel_simd(float *a) {
     a[i] += bar();
 }
 // TERM_DEBUG: !{{[0-9]+}} = !DILocation(line: [[@LINE-11]],
+
+// CHECK-LABEL: S8
+// CHECK-DAG: ptrtoint [[SS_TY]]* %{{.+}} to i64
+// CHECK-DAG: ptrtoint [[SS_TY]]* %{{.+}} to i64
+// CHECK-DAG: ptrtoint [[SS_TY]]* %{{.+}} to i64
+// CHECK-DAG: ptrtoint [[SS_TY]]* %{{.+}} to i64
+
+// CHECK-DAG: and i64 %{{.+}}, 15
+// CHECK-DAG: icmp eq i64 %{{.+}}, 0
+// CHECK-DAG: call void @llvm.assume(i1
+
+// CHECK-DAG: and i64 %{{.+}}, 7
+// CHECK-DAG: icmp eq i64 %{{.+}}, 0
+// CHECK-DAG: call void @llvm.assume(i1
+
+// CHECK-DAG: and i64 %{{.+}}, 15
+// CHECK-DAG: icmp eq i64 %{{.+}}, 0
+// CHECK-DAG: call void @llvm.assume(i1
+
+// CHECK-DAG: and i64 %{{.+}}, 3
+// CHECK-DAG: icmp eq i64 %{{.+}}, 0
+// CHECK-DAG: call void @llvm.assume(i1
+struct SS {
+  SS(): a(0) {}
+  SS(int v) : a(v) {}
+  int a;
+  typedef int type;
+};
+
+template <typename T>
+class S7 : public T {
+protected:
+  T *a;
+  T b[2];
+  S7() : a(0) {}
+
+public:
+  S7(typename T::type &v) : a((T*)&v) {
+#pragma omp simd aligned(a)
+    for (int k = 0; k < a->a; ++k)
+      ++this->a->a;
+#pragma omp simd aligned(this->b : 8)
+    for (int k = 0; k < a->a; ++k)
+      ++a->a;
+  }
+};
+
+class S8 : private IterDouble, public S7<SS> {
+  S8() {}
+
+public:
+  S8(int v) : S7<SS>(v){
+#pragma omp parallel private(a)
+#pragma omp simd aligned(S7<SS>::a)
+    for (int k = 0; k < a->a; ++k)
+      ++this->a->a;
+#pragma omp parallel shared(b)
+#pragma omp simd aligned(this->b: 4)
+    for (int k = 0; k < a->a; ++k)
+      ++a->a;
+  }
+};
+S8 s8(0);
+
+// TERM_DEBUG-NOT: line: 0,
+// TERM_DEBUG: distinct !DISubprogram(linkageName: "_GLOBAL__sub_I_simd_codegen.cpp",
+
 #endif // HEADER
 

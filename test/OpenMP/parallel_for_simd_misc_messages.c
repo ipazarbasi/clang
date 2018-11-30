@@ -1,5 +1,7 @@
 // RUN: %clang_cc1 -fsyntax-only -fopenmp -verify %s
 
+// RUN: %clang_cc1 -fsyntax-only -fopenmp-simd -verify %s
+
 // expected-error@+1 {{unexpected OpenMP directive '#pragma omp parallel for simd'}}
 #pragma omp parallel for simd
 
@@ -153,15 +155,15 @@ void test_safelen() {
 #pragma omp parallel for simd safelen(foo())
   for (i = 0; i < 16; ++i)
     ;
-// expected-error@+1 {{argument to 'safelen' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'safelen' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd safelen(-5)
   for (i = 0; i < 16; ++i)
     ;
-// expected-error@+1 {{argument to 'safelen' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'safelen' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd safelen(0)
   for (i = 0; i < 16; ++i)
     ;
-// expected-error@+1 {{argument to 'safelen' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'safelen' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd safelen(5 - 5)
   for (i = 0; i < 16; ++i)
     ;
@@ -238,15 +240,15 @@ void test_simdlen() {
 #pragma omp parallel for simd simdlen(foo())
   for (i = 0; i < 16; ++i)
     ;
-// expected-error@+1 {{argument to 'simdlen' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'simdlen' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd simdlen(-5)
   for (i = 0; i < 16; ++i)
     ;
-// expected-error@+1 {{argument to 'simdlen' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'simdlen' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd simdlen(0)
   for (i = 0; i < 16; ++i)
     ;
-// expected-error@+1 {{argument to 'simdlen' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'simdlen' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd simdlen(5 - 5)
   for (i = 0; i < 16; ++i)
     ;
@@ -356,17 +358,17 @@ void test_collapse() {
   for (i = 0; i < 16; ++i)
     ;
 #pragma omp parallel
-// expected-error@+1 {{argument to 'collapse' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'collapse' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd collapse(-5)
   for (i = 0; i < 16; ++i)
     ;
 #pragma omp parallel
-// expected-error@+1 {{argument to 'collapse' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'collapse' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd collapse(0)
   for (i = 0; i < 16; ++i)
     ;
 #pragma omp parallel
-// expected-error@+1 {{argument to 'collapse' clause must be a positive integer value}}
+// expected-error@+1 {{argument to 'collapse' clause must be a strictly positive integer value}}
 #pragma omp parallel for simd collapse(5 - 5)
   for (i = 0; i < 16; ++i)
     ;
